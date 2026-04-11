@@ -421,8 +421,8 @@ function armijo_line_search!(cost_func, x, grad, direction, bounds, scales,
         step_size *= β
         
         # If step becomes too small, return best point found
-        if abs(x_new[1] - x[1]) < 1e-3 && abs(x_new[2] * scales[2] - x[2] * scales[2]) < 1e-3
-            println("  \e[31mBoth parameter changes below 1e-3 threshold, returning best point found\e[0m")
+        if abs(x_new[1] - x[1]) < 1e-2 && abs(x_new[2] * scales[2] - x[2] * scales[2]) < 1e-2
+            println("  \e[31mBoth parameter changes below 1e-2 threshold, returning best point found\e[0m")
             return best_x, best_f, best_step, false
         end
     end
@@ -865,8 +865,8 @@ function true_conjugate_gradient_optimization_GRMHD(Iobs, ro, θoi, Rhighi, freq
     sucess::Bool = false
     
     # Parameter scaling factors (normalize to similar ranges)
-    θo_scale = 600.0
-    Rhigh_scale = 100.0
+    θo_scale = 100.0
+    Rhigh_scale = 200.0
     scales = [θo_scale, Rhigh_scale]
     
     # Initialize with scaled parameters
@@ -1005,12 +1005,13 @@ function true_conjugate_gradient_optimization_GRMHD(Iobs, ro, θoi, Rhighi, freq
     last_grad = nothing
 
     function cached_compute_cost_and_gradients(x_scaled_val, compute_gradients, σ_pixels=0.0, simulation_data = nothing, sensemode = "AD")
-
-        cost, grad = compute_cost_and_gradients(x_scaled_val, compute_gradients, σ_pixels, simulation_data, sensemode)
+        c, g = compute_cost_and_gradients(x_scaled_val, compute_gradients, σ_pixels, simulation_data, sensemode)
+        
         last_x_computed = copy(x_scaled_val)
-        last_cost = cost
-        last_grad = copy(grad)
-        return cost, grad
+        last_cost = c
+        last_grad = copy(g)
+        
+        return c, g
     end
     
 
@@ -1050,6 +1051,7 @@ function true_conjugate_gradient_optimization_GRMHD(Iobs, ro, θoi, Rhighi, freq
     step_size = 0.0
     aggressive_initial_step = 0.0
     direction_old = copy(direction)
+    grad_old = copy(grad)
     for iteration in 1:max_iterations
         println("\n--- Iteration $iteration ---")
         
@@ -1070,29 +1072,58 @@ function true_conjugate_gradient_optimization_GRMHD(Iobs, ro, θoi, Rhighi, freq
             step_limit_Rhigh = (optimize_Rhigh && abs(direction[2]) > 1e-16) ? (max_dRhigh_scaled / abs(direction[2])) : Inf
             
             # Pick the step size that keeps both parameters within their max jump
-            aggressive_initial_step = min(step_limit_θo, step_limit_Rhigh)
+            aggressive_initial_step = max(step_limit_θo, step_limit_Rhigh)
         else
-            if(step_size < 0.05/(Rhigh_scale * direction[2] ) && optimize_Rhigh)
-                step_size = 0.05/(Rhigh_scale * direction[2] )
-                println("Step size for Rhigh is too small, resetting to $step_size")
+            if(optimize_Rhigh && abs(direction[2]) > 1e-16)
+                min_step_Rhigh = 5.0 / (Rhigh_scale * abs(direction[2]))
+                if step_size < min_step_Rhigh
+                    step_size = min_step_Rhigh
+                    println("Step size for Rhigh is too small, resetting to $step_size")
+                end
             end
 
-            if(step_size < 0.1/(θo_scale * direction[1] ) && optimize_theta)
-                step_size = 0.1/(θo_scale * direction[1] )
-                println("Step size for θo is too small, resetting to $step_size")
+            if(optimize_theta && abs(direction[1]) > 1e-16)
+                min_step_theta = 5.0 / (θo_scale * abs(direction[1]))
+                if step_size < min_step_theta
+                    step_size = min_step_theta
+                    println("Step size for θo is too small, resetting to $step_size")
+                end
             end
             if(sucess)
-                # Correct the step size based on how the direction vector changed
-                correction_factor = norm(direction_old) / norm(direction)
+                # Calculate directional derivatives (dot products)
+                dir_deriv_old = dot(grad_old, direction_old)
+                dir_deriv_new = dot(grad, direction)
                 
-                # Cap the correction factor so a crazy beta update doesn't explode the step
-                correction_factor = clamp(correction_factor, 0.1, 10.0) 
-                
-                aggressive_initial_step = step_size * correction_factor
-                println("Line search successful. Scaled previous step size by $correction_factor -> new guess: $aggressive_initial_step")
+                # Prevent division by zero and ensure we only scale if it makes sense
+                if abs(dir_deriv_new) > 1e-40
+                    correction_factor = dir_deriv_old / dir_deriv_new
+                    
+                    # Clamp it so it doesn't explode if the new derivative is extremely flat
+                    correction_factor = clamp(correction_factor, 0.1, 5.0) 
+                    
+                    aggressive_initial_step = step_size * correction_factor
+                    println("Line search successful. CG scaled step size by $correction_factor -> new guess: $aggressive_initial_step")
+                else
+                    aggressive_initial_step = step_size * 1.5 # Fallback expansion
+                end
             else
                 println("Line search failed to find a better point, resetting aggressive initial step")
-                aggressive_initial_step = max(3.0, 0.3 / max(norm(grad), 1e-12))
+                #aggressive_initial_step = max(3.0, 0.3 / max(norm(grad), 1e-12))
+                #aggressive_initial_step = 0.3/norm(grad)
+                # Define the maximum physical jump you'll allow in the first step
+                max_dθo_phys = 10.0   # degrees
+                max_dRhigh_phys = 10.0 # Rhigh units
+                
+                # Convert to scaled limits
+                max_dθo_scaled = max_dθo_phys / θo_scale
+                max_dRhigh_scaled = max_dRhigh_phys / Rhigh_scale
+                
+                # Calculate the step size required to hit those limits
+                step_limit_θo = (optimize_theta && abs(direction[1]) > 1e-16) ? (max_dθo_scaled / abs(direction[1])) : Inf
+                step_limit_Rhigh = (optimize_Rhigh && abs(direction[2]) > 1e-16) ? (max_dRhigh_scaled / abs(direction[2])) : Inf
+                
+                # Pick the step size that keeps both parameters within their max jump
+                aggressive_initial_step = max(step_limit_θo, step_limit_Rhigh)
             end
         end
 
@@ -1186,6 +1217,10 @@ function true_conjugate_gradient_optimization_GRMHD(Iobs, ro, θoi, Rhighi, freq
                     return θos, Rhighs, costs, max_iterations
                 end
 
+                # Update old tracking variables before calculating the new ones!
+                grad_old .= grad
+                direction_old .= direction
+
                 _, grad = cached_compute_cost_and_gradients(
                     x_scaled, true, σ_pixels, simulation_data, sensemode
                 )
@@ -1228,11 +1263,11 @@ function true_conjugate_gradient_optimization_GRMHD(Iobs, ro, θoi, Rhighi, freq
         end
         if converged
             println("Converged! Final θo = $θo_phys, Final Rhigh = $Rhigh_phys")
-            return θos, Rhighs, costs, max_iterations
+            return θos, Rhighs, costs, iteration
         end
         
         grad_old = copy(grad)
-        direction_old = copy(direction) # ADD THIS LINE
+        direction_old = copy(direction)
         _, grad = cached_compute_cost_and_gradients(x_scaled, true, σ_pixels, simulation_data, sensemode)
         
         if iteration % cg_restart_freq == 0 || norm(grad) > 10 * norm(grad_old)

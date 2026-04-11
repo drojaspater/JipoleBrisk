@@ -55,11 +55,10 @@ const METRIC_EKS = 4
 const METRIC_MINKOWSKI = 5
 const METRIC_EMINKOWSKI = 6
 
-const ELECTRONS_TFLUID = 3  # Assuming 3 based on typical harm constants
-const USE_FIXED_TPTE = false # Set these defaults based on your simulation config
-const USE_MIXED_TPTE = true  # Set these defaults based on your simulation config
+const ELECTRONS_TFLUID = 3
+const USE_FIXED_TPTE = false
+const USE_MIXED_TPTE = true 
 
-# --- Structs ---
 
 # Holds the physics/metric parameters (formerly C globals)
 mutable struct GlobalParams
@@ -137,8 +136,6 @@ function GlobalParams()
 end
 
 
-# --- The Function ---
-
 function read_header(filename::String)
     println("Initializing grid from: $filename")
     
@@ -146,10 +143,8 @@ function read_header(filename::String)
     cstopx_2 = 0.0
 
     h5open(filename, "r") do file
-        # 1. Access Header
         header = file["header"]
         
-        # 2. Check Electrons / Radiation flags
         if haskey(header, "has_electrons")
             params.ELECTRONS = read(header, "has_electrons")
         else
@@ -166,7 +161,6 @@ function read_header(filename::String)
             error("Dump includes flag 'has_derefine_poles' and is therefore non-standard and not well-defined")
         end
 
-        # 3. Weights
         if haskey(header, "weights")
             weights = header["weights"]
             params.mu_i = read(weights, "mu_i")
@@ -177,9 +171,7 @@ function read_header(filename::String)
             params.ELECTRONS = ELECTRONS_TFLUID
         end
 
-        # 4. Metric Name & Type
         metric_name_str = read(header, "metric")
-        # Handle string encoding if necessary, usually Julia reads HDF5 strings directly
         if isa(metric_name_str, Vector{String}) || isa(metric_name_str, Vector{UInt8})
              # Sometimes HDF5 strings come as arrays, handle if needed. 
              # Usually standard read works. Assuming String here.
@@ -219,10 +211,6 @@ function read_header(filename::String)
             params.gamp = read(header, "gam_p")
         end
         params.Te_unit = params.Thetae_unit
-
-        # 6. Electron Model Override Logic
-        # (Assuming constants trat_small, trat_large, beta_crit are defined globally or here)
-        trat_small = 1.0; trat_large = 40.0; beta_crit = 1.0; tp_over_te = 3.0 # Defaults if not passed
         
         if !USE_FIXED_TPTE && !USE_MIXED_TPTE
             if params.ELECTRONS != 1
