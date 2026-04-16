@@ -9,7 +9,7 @@ function root_find_ad_safe(x, cstartx, cstopx)
     x3_val = root_find(x, cstartx, cstopx)
 
     # Reconstruct the state exactly at the root
-    x_eval = zeros(eltype(x), length(x))
+    x_eval = @MVector zeros(eltype(x), NDIM)
     x_eval[2] = log(x[2])
     x_eval[4] = x[4]
     x_eval[3] = x3_val
@@ -36,9 +36,9 @@ function root_find(x, cstartx, cstopx)
     """
     th = x[3]
 
-    xa = zeros(eltype(x), length(x))
-    xb = zeros(eltype(x), length(x))
-    xc = zeros(eltype(x), length(x))
+    xa = @MVector zeros(eltype(x), length(x))
+    xb = @MVector zeros(eltype(x), length(x))
+    xc = @MVector zeros(eltype(x), length(x))
 
     xa[2] = log(x[2])
     xa[4] = x[4]
@@ -161,7 +161,7 @@ function camera_position(cam_dist::Float64, cam_theta_angle, cam_phi_angle::Floa
     if(MODEL == "analytic" || MODEL == "thin_disk")
 
         T = promote_type(typeof(cam_dist), typeof(cam_theta_angle), typeof(cam_phi_angle), typeof(bhspin))
-        X = zeros(T, 4)
+        X = @MVector zeros(T, 4)
 
         X[1] = 0.0
         X[2] = log(cam_dist)
@@ -171,8 +171,8 @@ function camera_position(cam_dist::Float64, cam_theta_angle, cam_phi_angle::Floa
     elseif (MODEL == "iharm")
 
         T = promote_type(typeof(cam_dist), typeof(cam_theta_angle), typeof(cam_phi_angle), typeof(bhspin))
-        X = zeros(T, 4)
-        x = [zero(T), T(cam_dist), T(cam_theta_angle)/T(180) * T(π), T(cam_phi_angle)/T(180) * T(π)]
+        X = @MVector zeros(T, 4)
+        x = @SVector [zero(T), T(cam_dist), T(cam_theta_angle)/T(180) * T(π), T(cam_phi_angle)/T(180) * T(π)]
         X[1] = 0.0
         X[2] = log(cam_dist)
         #X[3] = root_find(x, params.cstartx, params.cstopx)

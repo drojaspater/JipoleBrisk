@@ -421,7 +421,7 @@ end
 
 
 
-function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
+Base.@inline function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
     """
     Pushes the photon geodesic forward/backwards by a step size dl/-dl using the analytic connection coefficients.
     Parameters:
@@ -602,62 +602,40 @@ function stop_backward_integration(X::MVec4, Kcon::MVec4, Rh::Float64, Rstop::Fl
 
     return 0
 end
-
 function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTraj}, step_max::Int, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
-    """
-    Function loops through the geodesic integration steps, pushing the photon along the geodesic.
-    Parameters:
-    @Xi: Initial position vector of the photon in internal coordinates.
-    @Kconi: Initial covariant 4-vector of the photon in internal coordinates.
-    @traj: Structure to store the trajectory of the photon.
-    @eps: Small constant for controlling the step size.
-    @step_max: Maximum number of steps for the geodesic integration.
-    @i: x-index of the pixel in the image plane (debugging purposes).
-    @j: y-index of the pixel in the image plane (debugging purposes).
-    """
     
     X = copy(Xi)
     Kcon = copy(Kconi)
     Xhalf = copy(Xi)
     Kconhalf = copy(Kconi)
 
-    push!(traj, OfTraj(
-        0,
-        copy(Xi),   
-        copy(Kconi),   
-        copy(Xi),   
-        copy(Kconi),
-        MVec4(undef), #This is dX_dθo for the derivatives in autodiff
-        MVec4(undef),  #This is dK_dθo for the derivatives in autodiff
-        MVec4(undef),  #This is dX_da for the derivatives in autodiff
-        MVec4(undef)  #This is dK_da for the derivatives in autodiff
-    ))
+    traj[1].dl = 0.0
+    traj[1].X .= Xi
+    traj[1].Kcon .= Kconi
+    traj[1].Xhalf .= Xi
+    traj[1].Kconhalf .= Kconi
+    
     nstep = 1
     lconn = Tensor3D(undef)
+    
     while (stop_backward_integration(X, Kcon, Rh, Rstop) == 0) && (nstep < step_max)
         dl = stepsize(X, Kcon, params.cstartx, params.cstopx)
 
         traj[nstep].dl = dl * L_unit * HPL / (ME * CL^2)
 
-
         push_photon!(X, Kcon, -dl, Xhalf, Kconhalf, lconn, bhspin)
 
         nstep += 1
-        push!(traj, OfTraj(
-            copy(dl),
-            copy(X),   
-            copy(Kcon),   
-            copy(Xhalf),   
-            copy(Kconhalf),
-            MVec4(undef), #This is dX_dθo for the derivatives in autodiff
-            MVec4(undef),  #This is dK_dθo for the derivatives in autodiff
-            MVec4(undef),  #This is dX_da for the derivatives in autodiff
-            MVec4(undef)  #This is dK_da for the derivatives in autodiff
-        ))
+        
+        # Write directly into the next pre-allocated index
+        traj[nstep].dl = dl
+        traj[nstep].X .= X
+        traj[nstep].Kcon .= Kcon
+        traj[nstep].Xhalf .= Xhalf
+        traj[nstep].Kconhalf .= Kconhalf
+        # The autodiff MVec4s are already initialized and waiting for you later!
     end
-    # println("Pixel ($i, $j): Number of steps = $nstep")
-    # println("  Final position: r = $(exp(X[2])), θ = $(X[3]), ϕ = $(X[4])")
-    # error()
+
     return nstep
 end
 

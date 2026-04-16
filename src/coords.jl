@@ -153,40 +153,44 @@ function set_dxdX(X)
     @X: Vector of position coordinates in internal coordinates.
     """
     T = eltype(X)
-    dxdX = TMMat4{T}(undef)
-    for mu in 1:NDIM
-        for nu in 1:NDIM
-            if mu == nu
-                dxdX[mu, nu] = 1.0
-            else
-                dxdX[mu, nu] = 0.0
-            end
-        end
-    end
-
-    dxdX[2,2] = exp(X[2])
-    if(MODEL == "analytic" || MODEL == "thin_disk")
-        dxdX[3,3] = π
-    elseif(MODEL == "iharm")
-        if(params.metric == METRIC_MKS)
-            dxdX[3,3] = π + (1 - params.hslope) * π * cos(2*π*X[3])
-        elseif(params.metric == METRIC_FMKS)
+    
+    # 1. Initialize an AD-safe, zeroed mutable static matrix
+    dxdX = zeros(MMatrix{4, 4, T})
+    
+    # 2. Set the trivial diagonal elements. 
+    # We use `one(T)` instead of `1.0` so it automatically becomes a Dual number if T is a Dual!
+    dxdX[1, 1] = one(T)
+    dxdX[4, 4] = one(T)
+    
+    # 3. Set the dynamic elements
+    dxdX[2, 2] = exp(X[2])
+    
+    if MODEL == "analytic" || MODEL == "thin_disk"
+        dxdX[3, 3] = T(π) # Cast to T for AD-safety
+    elseif MODEL == "iharm"
+        if params.metric == METRIC_MKS
+            dxdX[3, 3] = T(π) + (1 - params.hslope) * T(π) * cos(2 * T(π) * X[3])
+        elseif params.metric == METRIC_FMKS
             dxdX[3, 2] = -exp(params.mks_smooth * (params.startx[2] - X[2])) * params.mks_smooth * (π/2 - π*X[3] +params.poly_norm * (2*X[3] - 1) * (1 + ((-1 + 2*X[3])/params.poly_xt)^params.poly_alpha / (1 + params.poly_alpha)) - 0.5 * (1 - params.hslope) * sin(2*π*X[3]))
             dxdX[3, 3] = π + (1 - params.hslope) * π * cos(2*π*X[3]) +exp(params.mks_smooth * (params.startx[2] - X[2])) * (-π +2 * params.poly_norm * (1 + ((2*X[3]-1)/params.poly_xt)^params.poly_alpha / (params.poly_alpha + 1)) +(2 * params.poly_alpha * params.poly_norm * (2*X[3]-1) * ((2*X[3]-1)/params.poly_xt)^(params.poly_alpha-1)) / ((1 + params.poly_alpha) * params.poly_xt) -(1 - params.hslope) * π * cos(2*π*X[3]))
         else
             error("Unknown METRIC type: $METRIC")
         end
     end
-    if(dxdX[3,3] <= 0.0)
+    
+    if dxdX[3, 3] <= 0.0
         println("Warning! dxdX[3,3] is non-positive: ", dxdX[3,3])
         println("X[3] = ", X[3])
-        dxdX[3,3] = 1.0e-10  # Set a small positive value to avoid issues
+        dxdX[3, 3] = T(1.0e-10)  # Cast to T for AD-safety
     end
-
-    return dxdX
+    
+    # 4. FREEZE IT! Convert to an immutable SMatrix before returning.
+    # This completely eliminates the heap allocation.
+    return SMatrix(dxdX)
 end
 
-function gcov_ks(r, th, bhspin, gcov)
+Base.@inline function gcov_ks(r, th, bhspin)
+    gcov = zeros(MMatrix{4, 4, Float64})
     cth = cos(th)
     sth = sin(th)
 
@@ -206,6 +210,7 @@ function gcov_ks(r, th, bhspin, gcov)
     gcov[4,1] = gcov[1,4]
     gcov[4,2] = gcov[2,4]
     gcov[4,4] = s2 * (rho2 + bhspin * bhspin * s2 * (1. + 2. * r/rho2))
+    return SMatrix(gcov)
 end
 
 function set_dXdx(X)
@@ -271,7 +276,7 @@ function bl_coord(X, R0::Float64 = 0.0)
     return r, th
 end
 
-function bl_coord!(rt, X, R0::Float64 = 0.0)
+Base.@inline function bl_coord!(rt, X, R0::Float64 = 0.0)
     """
     Returns Boyer-Lindquist coordinates (r, th) from internal coordinates (X[2], X[3]).
     Parameters:
