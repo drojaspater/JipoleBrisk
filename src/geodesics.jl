@@ -316,11 +316,11 @@ function get_connection_analytic!(X::AbstractVector{T}, lconn::TTensor3D, bhspin
     s2th = 2.0 * sth * cth
     c2th = 2.0 * cth2 - 1.0
 
-    a2 = params.a * params.a
+    a2 = bhspin * bhspin
     a2sth2 = a2 * sth2
     a2cth2 = a2 * cth2
-    a3 = a2 * params.a
-    a4 = a3 * params.a
+    a3 = a2 * bhspin
+    a4 = a3 * bhspin
     a4cth4 = a4 * cth4
 
     rho2 = r2 + a2cth2
@@ -339,12 +339,12 @@ function get_connection_analytic!(X::AbstractVector{T}, lconn::TTensor3D, bhspin
     lconn[1, 1, 1] = 2.0 * r1 * fac1_rho23
     lconn[1, 1, 2] = r1 * (2.0 * r1 + rho2) * fac1_rho23
     lconn[1, 1, 3] = -a2 * r1 * s2th * dthdx2 * irho22
-    lconn[1, 1, 4] = -2.0 * params.a * r1sth2 * fac1_rho23
+    lconn[1, 1, 4] = -2.0 * bhspin * r1sth2 * fac1_rho23
 
     lconn[1, 2, 1] = lconn[1, 1, 2]
     lconn[1, 2, 2] = 2.0 * r2 * (r4 + r1 * fac1 - a4cth4) * irho23
     lconn[1, 2, 3] = -a2 * r2 * s2th * dthdx2 * irho22
-    lconn[1, 2, 4] = params.a * r1 * (-r1 * (r3 + 2 * fac1) + a4cth4) * sth2 * irho23
+    lconn[1, 2, 4] = bhspin * r1 * (-r1 * (r3 + 2 * fac1) + a4cth4) * sth2 * irho23
 
     lconn[1, 3, 1] = lconn[1, 1, 3]
     lconn[1, 3, 2] = lconn[1, 2, 3]
@@ -359,12 +359,12 @@ function get_connection_analytic!(X::AbstractVector{T}, lconn::TTensor3D, bhspin
     lconn[2, 1, 1] = fac3 * fac1 / (r1 * rho23)
     lconn[2, 1, 2] = fac1 * (-2.0 * r1 + a2sth2) * irho23
     lconn[2, 1, 3] = 0.0
-    lconn[2, 1, 4] = -params.a * sth2 * fac3 * fac1 / (r1 * rho23)
+    lconn[2, 1, 4] = -bhspin * sth2 * fac3 * fac1 / (r1 * rho23)
 
     lconn[2, 2, 1] = lconn[2, 1, 2]
     lconn[2, 2, 2] = (r4 * (-2.0 + r1) * (1.0 + r1) + a2 * (a2 * r1 * (1.0 + 3.0 * r1) * cth4 + a4 * cth4 * cth2 + r3 * sth2 + r1 * cth2 * (2.0 * r1 + 3.0 * r3 - a2sth2))) * irho23
     lconn[2, 2, 3] = -a2 * dthdx2 * s2th / fac2
-    lconn[2, 2, 4] = params.a * sth2 * (a4 * r1 * cth4 + r2 * (2 * r1 + r3 - a2sth2) + a2cth2 * (2.0 * r1 * (-1.0 + r2) + a2sth2)) * irho23
+    lconn[2, 2, 4] = bhspin * sth2 * (a4 * r1 * cth4 + r2 * (2 * r1 + r3 - a2sth2) + a2cth2 * (2.0 * r1 * (-1.0 + r2) + a2sth2)) * irho23
 
     lconn[2, 3, 1] = lconn[2, 1, 3]
     lconn[2, 3, 2] = lconn[2, 2, 3]
@@ -379,12 +379,12 @@ function get_connection_analytic!(X::AbstractVector{T}, lconn::TTensor3D, bhspin
     lconn[3, 1, 1] = -a2 * r1 * s2th * irho23_dthdx2
     lconn[3, 1, 2] = r1 * lconn[3, 1, 1]
     lconn[3, 1, 3] = 0.0
-    lconn[3, 1, 4] = params.a * r1 * (a2 + r2) * s2th * irho23_dthdx2
+    lconn[3, 1, 4] = bhspin * r1 * (a2 + r2) * s2th * irho23_dthdx2
 
     lconn[3, 2, 1] = lconn[3, 1, 2]
     lconn[3, 2, 2] = r2 * lconn[3, 1, 1]
     lconn[3, 2, 3] = r2 * irho2
-    lconn[3, 2, 4] = (params.a * r1 * cth * sth * (r3 * (2.0 + r1) + a2 * (2.0 * r1 * (1.0 + r1) * cth2 + a2 * cth4 + 2 * r1sth2))) * irho23_dthdx2
+    lconn[3, 2, 4] = (bhspin * r1 * cth * sth * (r3 * (2.0 + r1) + a2 * (2.0 * r1 * (1.0 + r1) * cth2 + a2 * cth4 + 2 * r1sth2))) * irho23_dthdx2
 
     lconn[3, 3, 1] = lconn[3, 1, 3]
     lconn[3, 3, 2] = lconn[3, 2, 3]
@@ -396,32 +396,32 @@ function get_connection_analytic!(X::AbstractVector{T}, lconn::TTensor3D, bhspin
     lconn[3, 4, 3] = lconn[3, 3, 4]
     lconn[3, 4, 4] = -cth * sth * (rho23 + a2sth2 * rho2 * (r1 * (4.0 + r1) + a2cth2) + 2.0 * r1 * a4 * sth4) * irho23_dthdx2
 
-    lconn[4, 1, 1] = params.a * fac1_rho23
+    lconn[4, 1, 1] = bhspin * fac1_rho23
     lconn[4, 1, 2] = r1 * lconn[4, 1, 1]
-    lconn[4, 1, 3] = -2.0 * params.a * r1 * cth * dthdx2 / (sth * rho22)
+    lconn[4, 1, 3] = -2.0 * bhspin * r1 * cth * dthdx2 / (sth * rho22)
     lconn[4, 1, 4] = -a2sth2 * fac1_rho23
 
     lconn[4, 2, 1] = lconn[4, 1, 2]
-    lconn[4, 2, 2] = params.a * r2 * fac1_rho23
-    lconn[4, 2, 3] = -2 * params.a * r1 * (a2 + 2 * r1 * (2.0 + r1) + a2 * c2th) * cth * dthdx2 / (sth * fac2 * fac2)
+    lconn[4, 2, 2] = bhspin * r2 * fac1_rho23
+    lconn[4, 2, 3] = -2 * bhspin * r1 * (a2 + 2 * r1 * (2.0 + r1) + a2 * c2th) * cth * dthdx2 / (sth * fac2 * fac2)
     lconn[4, 2, 4] = r1 * (r1 * rho22 - a2sth2 * fac1) * irho23
 
     lconn[4, 3, 1] = lconn[4, 1, 3]
     lconn[4, 3, 2] = lconn[4, 2, 3]
-    lconn[4, 3, 3] = -params.a * r1 * dthdx22 * irho2
+    lconn[4, 3, 3] = -bhspin * r1 * dthdx22 * irho2
     lconn[4, 3, 4] = dthdx2 * (0.25 * fac2 * fac2 * cth / sth + a2 * r1 * s2th) * irho22
 
     lconn[4, 4, 1] = lconn[4, 1, 4]
     lconn[4, 4, 2] = lconn[4, 2, 4]
     lconn[4, 4, 3] = lconn[4, 3, 4]
-    lconn[4, 4, 4] = (-params.a * r1sth2 * rho22 + a3 * sth4 * fac1) * irho23
+    lconn[4, 4, 4] = (-bhspin * r1sth2 * rho22 + a3 * sth4 * fac1) * irho23
 
 end
 
 
 
 
-function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
+Base.@inline function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
     """
     Pushes the photon geodesic forward/backwards by a step size dl/-dl using the analytic connection coefficients.
     Parameters:
@@ -491,11 +491,6 @@ function get_connection(X::AbstractVector{T}, bhspin, conn::TTensor3D) where T
     tmp = similar(conn)
     Xh = copy(X)
     Xl = copy(X)
-    # gcov::MMat4 = MMat4(undef)
-    # gcon::MMat4 = MMat4(undef)
-    # fill!(gcov, 0.0)
-    # gcov_func!(X, bhspin, gcov)
-    # gcon_func!(gcov, gcon)
 
     gcov = gcov_func(X, bhspin)
     gcon = gcon_func(gcov)
@@ -559,7 +554,7 @@ function stepsize(X::MVec4, Kcon::MVec4, cstartx::MVec4, cstopx::MVec4, eps_ipol
     dl::Float64 = 0.0
 
     
-    if(false)
+    if(true)
         deh::Float64 = min(abs(X[2] - cstartx[2]), 0.1)
         dlx2 = eps_ipole * (10 * deh) / (abs(Kcon[2]) + SMALL*SMALL)
         cut::Float64 = 0.02
@@ -602,62 +597,40 @@ function stop_backward_integration(X::MVec4, Kcon::MVec4, Rh::Float64, Rstop::Fl
 
     return 0
 end
-
 function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTraj}, step_max::Int, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
-    """
-    Function loops through the geodesic integration steps, pushing the photon along the geodesic.
-    Parameters:
-    @Xi: Initial position vector of the photon in internal coordinates.
-    @Kconi: Initial covariant 4-vector of the photon in internal coordinates.
-    @traj: Structure to store the trajectory of the photon.
-    @eps: Small constant for controlling the step size.
-    @step_max: Maximum number of steps for the geodesic integration.
-    @i: x-index of the pixel in the image plane (debugging purposes).
-    @j: y-index of the pixel in the image plane (debugging purposes).
-    """
     
     X = copy(Xi)
     Kcon = copy(Kconi)
     Xhalf = copy(Xi)
     Kconhalf = copy(Kconi)
 
-    push!(traj, OfTraj(
-        0,
-        copy(Xi),   
-        copy(Kconi),   
-        copy(Xi),   
-        copy(Kconi),
-        MVec4(undef), #This is dX_dθo for the derivatives in autodiff
-        MVec4(undef),  #This is dK_dθo for the derivatives in autodiff
-        MVec4(undef),  #This is dX_da for the derivatives in autodiff
-        MVec4(undef)  #This is dK_da for the derivatives in autodiff
-    ))
+    traj[1].dl = 0.0
+    traj[1].X .= Xi
+    traj[1].Kcon .= Kconi
+    traj[1].Xhalf .= Xi
+    traj[1].Kconhalf .= Kconi
+    
     nstep = 1
     lconn = Tensor3D(undef)
+    
     while (stop_backward_integration(X, Kcon, Rh, Rstop) == 0) && (nstep < step_max)
         dl = stepsize(X, Kcon, params.cstartx, params.cstopx)
 
         traj[nstep].dl = dl * L_unit * HPL / (ME * CL^2)
 
-
         push_photon!(X, Kcon, -dl, Xhalf, Kconhalf, lconn, bhspin)
 
         nstep += 1
-        push!(traj, OfTraj(
-            copy(dl),
-            copy(X),   
-            copy(Kcon),   
-            copy(Xhalf),   
-            copy(Kconhalf),
-            MVec4(undef), #This is dX_dθo for the derivatives in autodiff
-            MVec4(undef),  #This is dK_dθo for the derivatives in autodiff
-            MVec4(undef),  #This is dX_da for the derivatives in autodiff
-            MVec4(undef)  #This is dK_da for the derivatives in autodiff
-        ))
+        
+        # Write directly into the next pre-allocated index
+        traj[nstep].dl = dl
+        traj[nstep].X .= X
+        traj[nstep].Kcon .= Kcon
+        traj[nstep].Xhalf .= Xhalf
+        traj[nstep].Kconhalf .= Kconhalf
+        # The autodiff MVec4s are already initialized and waiting for you later!
     end
-    # println("Pixel ($i, $j): Number of steps = $nstep")
-    # println("  Final position: r = $(exp(X[2])), θ = $(X[3]), ϕ = $(X[4])")
-    # error()
+
     return nstep
 end
 
