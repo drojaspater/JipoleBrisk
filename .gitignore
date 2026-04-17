@@ -1,20 +1,21 @@
 /output/pixel*
 src/models/iharm3dDumps/sample_dump_SANE_a+0.94_MKS_0900.h5
-
 scripts/*
+
 # Ignore all txt by default
 *.txt
 !Tables/ch24_vals.txt
+
 # BUT keep the license
 !License.txt
-/notebooks/*
+/example_notebooks/*
+
 #except for the following notebooks: Autodiff_GRMHD.ipynb Autodiff.ipynb ComputeGeodesics.ipynb GenerateImageGRMHD.ipynb Generateimages.ipynb
-!notebooks/Autodiff_GRMHD.ipynb
-#!notebooks/ComparisonGRMHD.ipynb
-!notebooks/Autodiff.ipynb
-!notebooks/ComputeGeodesics.ipynb
-!notebooks/GenerateImageGRMHD.ipynb
-!notebooks/Generateimages.ipynb
+!example_notebooks/Autodiff_GRMHD.ipynb
+!example_notebooks/Autodiff.ipynb
+!example_notebooks/ComputeGeodesics.ipynb
+!example_notebooks/GenerateImageGRMHD.ipynb
+!example_notebooks/Generateimages.ipynb
 
 # Generated figures
 *.png

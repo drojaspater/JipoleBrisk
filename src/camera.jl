@@ -4,27 +4,21 @@ include("../src/metrics.jl")
 
 
 function root_find_ad_safe(x, cstartx, cstopx)
-    # Run safe bisection to get the exact numerical root
-    # (This value is mathematically correct, but its AD gradient is 0)
     x3_val = root_find(x, cstartx, cstopx)
 
-    # Reconstruct the state exactly at the root
-    x_eval = @MVector zeros(eltype(x), NDIM)
-    x_eval[2] = log(x[2])
-    x_eval[4] = x[4]
-    x_eval[3] = x3_val
+    T = eltype(x)
+    c1 = zero(T)
+    c2 = log(x[2])
+    c4 = x[4]
 
-    # Compute the local slope (derivative) using a tiny finite difference step
+    x_eval = @SVector [c1, c2, x3_val, c4]
+
     eps = 1e-7
-    x_eval_eps = copy(x_eval)
-    x_eval_eps[3] += eps
+    
+    x_eval_eps = @SVector [c1, c2, x3_val + eps, c4]
+    
     slope = (theta_func(x_eval_eps) - theta_func(x_eval)) / eps
 
-    # Attach the gradient using a single Newton step!
-    # Since x3_val is the exact root, `(theta_func(x_eval) - x[3])` is ~0.
-    # Therefore, the returned VALUE is exactly x3_val.
-    # But because x[3] is explicitly in the formula, AutoDiff traces it 
-    # and perfectly calculates the non-zero derivative
     return x3_val - (theta_func(x_eval) - x[3]) / slope
 end
 
@@ -35,53 +29,56 @@ function root_find(x, cstartx, cstopx)
     @x: Vector of position coordinates in internal coordinates.
     """
     th = x[3]
+    T = eltype(x)
+    
+    # Cache the constant parts of the vector
+    c1 = zero(T)
+    c2 = log(x[2])
+    c4 = x[4]
 
-    xa = @MVector zeros(eltype(x), length(x))
-    xb = @MVector zeros(eltype(x), length(x))
-    xc = @MVector zeros(eltype(x), length(x))
+    # Track ONLY the scalar theta values
+    xa3 = zero(T)
+    xb3 = zero(T)
 
-    xa[2] = log(x[2])
-    xa[4] = x[4]
-    xb[2] = xa[2]
-    xb[4] = xa[4]
-    xc[2] = xa[2]
-    xc[4] = xa[4]
-        
     if x[3] < π / 2.
-        xa[3] = cstartx[3]
-        xb[3] = (cstopx[3] - cstartx[3]) / 2 + SMALL
+        xa3 = cstartx[3]
+        xb3 = (cstopx[3] - cstartx[3]) / 2 + SMALL
     else
-        xa[3] = (cstopx[3] - cstartx[3]) / 2 - SMALL
-        xb[3] = cstopx[3]
+        xa3 = (cstopx[3] - cstartx[3]) / 2 - SMALL
+        xb3 = cstopx[3]
     end
 
-    tol:: Float64 = 1.e-9
-    tha = theta_func(xa)
-    thb = theta_func(xb)
+    tol::Float64 = 1.e-9
+    
+    # Build SVectors on the fly for the function calls
+    tha = theta_func(@SVector [c1, c2, xa3, c4])
+    thb = theta_func(@SVector [c1, c2, xb3, c4])
 
-    if(abs(tha - th) < tol)
-        return xa[3]
-    elseif(abs(thb - th) < tol)
-        return xb[3]
+    if abs(tha - th) < tol
+        return xa3
+    elseif abs(thb - th) < tol
+        return xb3
     end
 
+    xc3 = zero(T)
+    
     for i in 1:1000
-        xc[3] = 0.5 * (xa[3] + xb[3])
-        thc = theta_func(xc)
+        xc3 = 0.5 * (xa3 + xb3)
+        thc = theta_func(@SVector [c1, c2, xc3, c4])
 
-        if((thc - th) * (thb - th) < 0.)
-            xa[3] = xc[3]
+        if (thc - th) * (thb - th) < 0.
+            xa3 = xc3
         else
-            xb[3] = xc[3]
+            xb3 = xc3
         end
 
         err = thc - th
-        if(abs(err) < tol)
+        if abs(err) < tol
             break
         end
     end
 
-  return xc[3];
+    return xc3
 end
 
 function root_find_newton(x, cstartx, cstopx)
@@ -161,25 +158,19 @@ function camera_position(cam_dist::Float64, cam_theta_angle, cam_phi_angle::Floa
     if(MODEL == "analytic" || MODEL == "thin_disk")
 
         T = promote_type(typeof(cam_dist), typeof(cam_theta_angle), typeof(cam_phi_angle), typeof(bhspin))
-        X = @MVector zeros(T, 4)
+        return @SVector [zero(T), log(cam_dist), cam_theta_angle / 180,  (cam_phi_angle / 180) * π]
 
-        X[1] = 0.0
-        X[2] = log(cam_dist)
-        X[3] = cam_theta_angle / 180 
-        X[4] = cam_phi_angle/180 * π
-        return X
     elseif (MODEL == "iharm")
 
         T = promote_type(typeof(cam_dist), typeof(cam_theta_angle), typeof(cam_phi_angle), typeof(bhspin))
-        X = @MVector zeros(T, 4)
         x = @SVector [zero(T), T(cam_dist), T(cam_theta_angle)/T(180) * T(π), T(cam_phi_angle)/T(180) * T(π)]
-        X[1] = 0.0
-        X[2] = log(cam_dist)
-        #X[3] = root_find(x, params.cstartx, params.cstopx)
-        X[3] = root_find_ad_safe(x, params.cstartx, params.cstopx)
-        #X[3] = cam_theta_angle / 180
-        X[4] = cam_phi_angle/180 * π
-        return X
+        x3_val = root_find_ad_safe(x, params.cstartx, params.cstopx)
+        return @SVector [
+            zero(T), 
+            log(cam_dist), 
+            x3_val, 
+            (cam_phi_angle / 180) * π
+        ]
     else
         error("Unknown MODEL type: $MODEL")
     end
