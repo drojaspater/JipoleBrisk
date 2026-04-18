@@ -31,12 +31,12 @@ function thindisk_region(Xi::MVec4, Xf::MVec4)::Bool
     em_region::Bool = (r_f > r_isco && r_f < Rout)
     return midplane && em_region
 end
-function radiating_region(X::MVec4, Rh::Float64)
+function radiating_region(X::SVector{4, Float64}, Rh::Float64)
     return false
 end
 
 
-function GetTDBoundaryCondition(X::MVec4, Kcon::MVec4, a::Float64, Rh::Float64)
+function GetTDBoundaryCondition(X::SVector{4, Float64}, Kcon::SVector{4, Float64}, a::Float64, Rh::Float64)
     r, _ = bl_coord(X)
 
     if(r > Rh)
@@ -216,7 +216,7 @@ function load_chandra_tab24()
 end
 ch_mu, ch_I, ch_delta = load_chandra_tab24()
 
-function get_model_fourv(X::MVec4, a::Float64)
+@inline function get_model_fourv(X::MVec4, a::Float64)
     gcov::MMat4 = gcov_func(X, a)
     r, _ = bl_coord(X)
     _, omega = thindisk_vals(r, a)

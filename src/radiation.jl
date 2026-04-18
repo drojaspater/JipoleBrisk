@@ -22,21 +22,21 @@ function Bnu_inv(nu, θe)
     end
 end
 
-function jar_calc(data, X, Kcon, bhspin, derivative_calculation = false)
+function jar_calc(data, X, Kcon, bhspin, ::Val{B} = Val(false)) where {B}
+    z_base = zero(eltype(X)) 
+    
     Ne = get_model_ne(X, data)
-    if(Ne == 0.0)
-        if(derivative_calculation)
-            return (0.0, 0.0, 0.0, 0.0)
-        end
-        return (0.0, 0.0)
+    if Ne == 0.0
+        return (z_base, z_base, z_base, z_base)
     end
 
-    # make Ucon use a promoted element type between X and bhspin (handles Dual numbers)
     elT = promote_type(eltype(X), typeof(bhspin))
-    Ucon = similar(X, elT)
-    Ucov = similar(Ucon)
-    Bcon = similar(Ucon)
-    Bcov = similar(Ucon)
+    
+    Ucon = MVector{4, elT}(undef)
+    Ucov = MVector{4, elT}(undef)
+    Bcon = MVector{4, elT}(undef)
+    Bcov = MVector{4, elT}(undef)
+    
     get_model_fourv(data, X, Kcon, Ucon, Ucov, Bcon, Bcov, bhspin)
     nu = get_fluid_nu(Kcon, Ucov)
     nusq = nu * nu
@@ -44,53 +44,46 @@ function jar_calc(data, X, Kcon, bhspin, derivative_calculation = false)
     b = get_model_b(X, data)
     
     θe =  get_model_thetae(X, data)
-    if(θ <= 0.0 || θ >= π)
-        if(derivative_calculation)
-            return (0., 0., 0., 0.)
-        end
-        return (0., 0.);
+    if θ <= 0.0 || θ >= π
+        return (z_base, z_base, z_base, z_base)
     end
 
     j = maxwell_juettner_I(b, θ, θe, nu, Ne) / nusq    
     Bnuinv = Bnu_inv(nu, θe)
-    k = 0.0
-    if(Bnuinv > 0)
-        k = j/Bnuinv
-    end
-    if(derivative_calculation)
-        #interpolate dthetae/dRhigh
+    z_jk = zero(typeof(j))
+    
+    k = (Bnuinv > 0) ? j/Bnuinv : z_jk
+    
+    if B 
         dθe_dRhigh = get_model_thetae_deriv(X, data)
-        #derivative of j with respect to θe using autodiff
         dj_dθe = ForwardDiff.derivative(θe -> maxwell_juettner_I(b, θ, θe, nu, Ne) / nusq, θe)
-        #derivative of k with respect to θe using autodiff
-        if(Bnuinv > 0)
+        
+        if Bnuinv > 0
             dk_dθe = (dj_dθe * Bnuinv - j * ForwardDiff.derivative(θe -> Bnu_inv(nu, θe), θe)) / (Bnuinv * Bnuinv)
         else
-            dk_dθe = 0.0
+            dk_dθe = z_jk
         end
 
         dj_dRhigh = dj_dθe * dθe_dRhigh
         dk_dRhigh = dk_dθe * dθe_dRhigh
 
         return (j, k, dj_dRhigh, dk_dRhigh)
+    else
+        return (j, k, z_jk, z_jk) 
     end
-
-    return (j, k)
-
 end
 
 
-function get_jk(X, Kcon, freq::Float64, bhspin, data; derivative_calculation = false)
-
+# B extracts the true/false into a compile-time constant
+function get_jk(X, Kcon, freq::Float64, bhspin, data, derivative_calculation::Val{B} = Val(false)) where {B}
     if MODEL == "analytic"
         return get_analytic_jk(X, Kcon, freq, bhspin)
     elseif MODEL == "thin_disk"
-        return (zero(eltype(X)), zero(eltype(X)))
+        z = zero(eltype(X))
+        return (z, z, z, z)
     elseif MODEL == "iharm"
-        if(data === nothing)
-            error("data must be provided for iharm model")
-        end
-        return jar_calc(data, X, Kcon, bhspin, derivative_calculation)
+        # Pass the Val(B) object down
+        return jar_calc(data, X, Kcon, bhspin, derivative_calculation) 
     else
         error("Unknown model: $MODEL")
     end

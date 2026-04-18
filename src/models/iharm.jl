@@ -656,7 +656,7 @@ function get_model_b(X, data)
     return interp_scalar_time(X, data[nA].b, data[nB].b, tfac)
 end
 
-function get_model_fourv(data, X, Kcon, Ucon, Ucov, Bcon, Bcov, bhspin)
+@inline function get_model_fourv(data, X, Kcon, Ucon, Ucov, Bcon, Bcov, bhspin)
     gcov = gcov_func(X, bhspin)
     gcon = gcon_func(gcov)
 
@@ -724,7 +724,7 @@ end
 
 
 
-function radiating_region(X::MVec4, Rh::Float64)
+function radiating_region(X::SVector{4, Float64}, Rh::Float64)
     """
     Checks if the position is within the radiating region.
     Parameters:

@@ -2,7 +2,7 @@ using HDF5
 startX::MVec4 = MVec4(undef)
 stopX::MVec4 = MVec4(undef)
 
-function get_model_fourv(X::MVec4)
+@inline function get_model_fourv(X::MVec4)
     """
     Calculates Ucon, Ucov, Bcon and Bcov from primitives at location X using interpolation.
 

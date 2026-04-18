@@ -10,27 +10,21 @@ const MVec4  = MVector{4,Float64}
 #
 const TMVec4{T} = MVector{4,T}
 
-#Mutable 4x4 matrix allocated on the stack
 const MMat4 = MMatrix{4,4,Float64}
-
 const TMMat4{T} = MMatrix{4,4,T,16}
-
-#Mutable 3-dimensional vector allocated on the stack
 const Tensor3D = MArray{Tuple{4,4,4}, Float64, 3, 64}  # 4×4×4 mutable tensor
 const TTensor3D{T} = MArray{Tuple{4,4,4}, T, 3, 64}  # 4×4×4 mutable tensor
 
-
-
-mutable struct OfTraj
+struct OfTraj
     dl::Float64
-    X::MVec4
-    Kcon::MVec4
-    Xhalf::MVec4
-    Kconhalf::MVec4
-    dX_dθo::MVec4
-    dK_dθo::MVec4
-    dX_da::MVec4
-    dK_da::MVec4
+    X::SVector{4, Float64}
+    Kcon::SVector{4, Float64}
+    Xhalf::SVector{4, Float64}
+    Kconhalf::SVector{4, Float64}
+    dX_dθo::SVector{4, Float64}
+    dK_dθo::SVector{4, Float64}
+    dX_da::SVector{4, Float64}
+    dK_da::SVector{4, Float64}
 end
 
 include("constants.jl")
