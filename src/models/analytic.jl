@@ -19,7 +19,7 @@ const RHO_unit = 3.e-18
 const U_unit = RHO_unit * CL^2  # Internal energy density unit in erg
 const B_unit = CL * sqrt(4 * π * RHO_unit)  # Magnetic field unit in Gauss
 
-function radiating_region(X::MVec4, Rh::Float64)
+function radiating_region(X::SVector{4, Float64}, Rh::Float64)
     """
     Checks if the position is within the radiating region.
     Parameters:
@@ -96,11 +96,15 @@ function get_analytic_jk(X, Kcon, freqcgs::Float64, bhspin)
     """
     Ne = get_model_ne(X)
     if (Ne <= 0.)
-        return 0.0, 0.0
+        # Use zero(eltype(X)) to match Float64 or Dual
+        z = zero(eltype(X)) 
+        return z, z, z, z
     end
-    Ucov= get_model_4vel(X, bhspin)
+    
+    Ucov = get_model_4vel(X, bhspin)
     ν = get_fluid_nu(Kcon, Ucov)
-    if(ν <= 0. || any(isnan(ν)) || any(isinf(ν)))
+    
+    if(ν <= 0. || any(isnan.(ν)) || any(isinf.(ν)))
         println("At X = $X\n Kcon = $Kcon")
         println("Ucov = $Ucov")
         println("Kcon $Kcon")
@@ -121,5 +125,7 @@ function get_analytic_jk(X, Kcon, freqcgs::Float64, bhspin)
         error("Invalid knu_inv computed: $knu_inv")
     end
     
-    return jnu_inv, knu_inv
+    # Extract the exact type of jnu_inv (Float64 or Dual) to pad the derivatives
+    z = zero(typeof(jnu_inv))
+    return jnu_inv, knu_inv, z, z
 end

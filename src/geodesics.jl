@@ -176,7 +176,7 @@ function get_pixel(traj::Vector{OfTraj}, i::Int, j::Int, Xcam::MVec4, maxnstep, 
 
 
     if nstep >= maxnstep - 1
-        @error "Max number of steps exceeded at pixel ($i, $j)"
+        @error "Max number of steps exceeded at pixel ($i, $j), nstep = $nstep"
     end
 
     return nstep
@@ -216,6 +216,202 @@ function CalculateGeodesics(Xcam, fovx, fovy, freq_cgs, maxnstep, nx, ny, bhspin
         end
     end
     return trajs
+end
+# 1. Add @inline and remove lconn! from the signature (also rename to remove the "!")
+@inline function get_connection_analytic(X::AbstractVector{T}, bhspin) where T
+       
+    lconn = MArray{Tuple{4,4,4}, T, 3, 64}(undef)
+
+    r1 = exp(X[2]) 
+    r2 = r1 * r1
+    r3 = r2 * r1
+    r4 = r3 * r1
+    r,th = bl_coord(X)
+
+
+    if(MODEL == "analytic" || MODEL == "thin_disk")
+        th = π * X[3]
+        dthdx2 = π
+        d2thdx22 = 0.0
+        dthdx22 = dthdx2 * dthdx2
+    elseif(MODEL == "iharm")
+        if(params.metric == METRIC_MKS)
+            th = π * X[3] + ((1.0 - params.hslope) / 2.0) * sin(2.0 * π * X[3])
+            dthdx2 = π + (1.0 - params.hslope) * π * cos(2.0 * π * X[3])
+            d2thdx22 = -2.0 * π^2 * (1.0 - params.hslope) * sin(2.0 * π * X[3])
+            dthdx22 = dthdx2 * dthdx2
+
+        elseif(params.metric == METRIC_FMKS)
+            error("FMKS metric is not currently supported in the analytic connection. Please use MKS metric for now.")
+            # Aliases for readability
+            x1 = X[2]
+            x2 = X[3]
+            h = params.hslope
+            pn = params.poly_norm
+            px = params.poly_xt
+            pa = params.poly_alpha
+            ms = params.mks_smooth
+            x10 = params.startx[2]
+            
+            # 1. Base MKS angle (thG) and its derivatives w.r.t x2
+            thG = π * x2 + ((1.0 - h) / 2.0) * sin(2.0 * π * x2)
+            thG_p = π + (1.0 - h) * π * cos(2.0 * π * x2)
+            thG_pp = -2.0 * π^2 * (1.0 - h) * sin(2.0 * π * x2)
+            
+            # 2. Jet angle (thJ) and its derivatives w.r.t x2
+            y = 2.0 * x2 - 1.0
+            u = y / px
+            
+            thJ = pn * y * (1.0 + (u^pa) / (pa + 1.0)) + 0.5 * π
+            thJ_p = 2.0 * pn * (1.0 + (u^pa) / (pa + 1.0)) + pn * y * (pa * u^(pa - 1.0)) / (pa + 1.0) * (2.0 / px)
+            thJ_pp = (8.0 * pn * pa) / (px * (pa + 1.0)) * u^(pa - 1.0) + (4.0 * pn * pa * (pa - 1.0) * y) / (px^2 * (pa + 1.0)) * u^(pa - 2.0)
+            
+            # 3. Radial modulation factor
+            f = exp(ms * (x10 - x1))
+            
+            # 4. Final theta and derivatives
+            th = thG + f * (thJ - thG)
+            dthdx2 = thG_p + f * (thJ_p - thG_p)
+            d2thdx22 = thG_pp + f * (thJ_pp - thG_pp)
+            dthdx22 = dthdx2 * dthdx2
+        else
+            error("Unknown METRIC type: $(params.metric)")
+        end
+    else
+        error("Unknown model: $MODEL")
+    end
+    # elseif(MODEL == "iharm")
+    #     E = exp(params.mks_smooth * (params.startx[2] - X[2]))
+    #     dthG = π * (1.0 + (1.0 - params.hslope) * cos(2.0 * π * X[3]))
+    #     y = 2 * X[3] - 1.0
+    #     dthJ = 2 * params.poly_norm * (1 + (y/params.poly_xt)^params.poly_alpha)
+    #     dthG2 = -2 * π * π * (1.0 - params.hslope) * sin(2.0 * π * X[3])
+    #     dthJ2 = 4 * params.poly_norm * params.poly_alpha * (y/params.poly_xt)^(params.poly_alpha - 1) / params.poly_xt
+    #     dthdx2 = (1.0 - E) * dthG + E * dthJ
+    #     d2thdx22 = (1.0 - E) * dthG2 + E * dthJ2
+    #     dthdx22 = dthdx2 * dthdx2
+        
+    #     thG = π * X[3] + ((1. - params.hslope) / 2.) * sin(2. * π * X[3]);
+    #     thJ = params.poly_norm * y* (1. + ((y / params.poly_xt)^params.poly_alpha) / (params.poly_alpha + 1.)) + 0.5 * π;
+
+    #     dthdx1 = -params.mks_smooth * exp(params.mks_smooth * (params.startx[2] - X[2])) * (thJ - thG);
+    #     d2thdx12 = params.mks_smooth^2 * exp(params.mks_smooth * (params.startx[2] - X[2])) * (thJ - thG);
+    #     d2thdx1_2 = -2.0 * params.mks_smooth * exp(params.mks_smooth * (params.startx[2] - X[2])) * (dthJ - dthG);
+
+    # else
+    #     error("Unknown model: $MODEL")
+    # end
+
+    sth = sin(th)
+    cth = cos(th)
+    sth2 = sth * sth
+    r1sth2 = r1 * sth2
+    sth4 = sth2 * sth2
+    cth2 = cth * cth
+    cth4 = cth2 * cth2
+    s2th = 2.0 * sth * cth
+    c2th = 2.0 * cth2 - 1.0
+
+    a2 = bhspin * bhspin
+    a2sth2 = a2 * sth2
+    a2cth2 = a2 * cth2
+    a3 = a2 * bhspin
+    a4 = a3 * bhspin
+    a4cth4 = a4 * cth4
+
+    rho2 = r2 + a2cth2
+    rho22 = rho2 * rho2
+    rho23 = rho22 * rho2
+    irho2 = 1.0 / rho2
+    irho22 = irho2 * irho2
+    irho23 = irho22 * irho2
+    irho23_dthdx2 = irho23 / dthdx2
+
+    fac1 = r2 - a2cth2
+    fac1_rho23 = fac1 * irho23
+    fac2 = a2 + 2 * r2 + a2 * c2th
+    fac3 = a2 + r1 * (-2.0 + r1)
+
+    lconn[1, 1, 1] = 2.0 * r1 * fac1_rho23
+    lconn[1, 1, 2] = r1 * (2.0 * r1 + rho2) * fac1_rho23
+    lconn[1, 1, 3] = -a2 * r1 * s2th * dthdx2 * irho22
+    lconn[1, 1, 4] = -2.0 * bhspin * r1sth2 * fac1_rho23
+
+    lconn[1, 2, 1] = lconn[1, 1, 2]
+    lconn[1, 2, 2] = 2.0 * r2 * (r4 + r1 * fac1 - a4cth4) * irho23
+    lconn[1, 2, 3] = -a2 * r2 * s2th * dthdx2 * irho22
+    lconn[1, 2, 4] = bhspin * r1 * (-r1 * (r3 + 2 * fac1) + a4cth4) * sth2 * irho23
+
+    lconn[1, 3, 1] = lconn[1, 1, 3]
+    lconn[1, 3, 2] = lconn[1, 2, 3]
+    lconn[1, 3, 3] = -2.0 * r2 * dthdx22 * irho2
+    lconn[1, 3, 4] = a3 * r1sth2 * s2th * dthdx2 * irho22
+
+    lconn[1, 4, 1] = lconn[1, 1, 4]
+    lconn[1, 4, 2] = lconn[1, 2, 4]
+    lconn[1, 4, 3] = lconn[1, 3, 4]
+    lconn[1, 4, 4] = 2.0 * r1sth2 * (-r1 * rho22 + a2sth2 * fac1) * irho23
+
+    lconn[2, 1, 1] = fac3 * fac1 / (r1 * rho23)
+    lconn[2, 1, 2] = fac1 * (-2.0 * r1 + a2sth2) * irho23
+    lconn[2, 1, 3] = 0.0
+    lconn[2, 1, 4] = -bhspin * sth2 * fac3 * fac1 / (r1 * rho23)
+
+    lconn[2, 2, 1] = lconn[2, 1, 2]
+    lconn[2, 2, 2] = (r4 * (-2.0 + r1) * (1.0 + r1) + a2 * (a2 * r1 * (1.0 + 3.0 * r1) * cth4 + a4 * cth4 * cth2 + r3 * sth2 + r1 * cth2 * (2.0 * r1 + 3.0 * r3 - a2sth2))) * irho23
+    lconn[2, 2, 3] = -a2 * dthdx2 * s2th / fac2
+    lconn[2, 2, 4] = bhspin * sth2 * (a4 * r1 * cth4 + r2 * (2 * r1 + r3 - a2sth2) + a2cth2 * (2.0 * r1 * (-1.0 + r2) + a2sth2)) * irho23
+
+    lconn[2, 3, 1] = lconn[2, 1, 3]
+    lconn[2, 3, 2] = lconn[2, 2, 3]
+    lconn[2, 3, 3] = -fac3 * dthdx22 * irho2
+    lconn[2, 3, 4] = 0.0
+
+    lconn[2, 4, 1] = lconn[2, 1, 4]
+    lconn[2, 4, 2] = lconn[2, 2, 4]
+    lconn[2, 4, 3] = lconn[2, 3, 4]
+    lconn[2, 4, 4] = -fac3 * sth2 * (r1 * rho22 - a2 * fac1 * sth2) / (r1 * rho23)
+
+    lconn[3, 1, 1] = -a2 * r1 * s2th * irho23_dthdx2
+    lconn[3, 1, 2] = r1 * lconn[3, 1, 1]
+    lconn[3, 1, 3] = 0.0
+    lconn[3, 1, 4] = bhspin * r1 * (a2 + r2) * s2th * irho23_dthdx2
+
+    lconn[3, 2, 1] = lconn[3, 1, 2]
+    lconn[3, 2, 2] = r2 * lconn[3, 1, 1]
+    lconn[3, 2, 3] = r2 * irho2
+    lconn[3, 2, 4] = (bhspin * r1 * cth * sth * (r3 * (2.0 + r1) + a2 * (2.0 * r1 * (1.0 + r1) * cth2 + a2 * cth4 + 2 * r1sth2))) * irho23_dthdx2
+
+    lconn[3, 3, 1] = lconn[3, 1, 3]
+    lconn[3, 3, 2] = lconn[3, 2, 3]
+    lconn[3, 3, 3] = -a2 * cth * sth * dthdx2 * irho2 + d2thdx22 / dthdx2
+    lconn[3, 3, 4] = 0.0
+
+    lconn[3, 4, 1] = lconn[3, 1, 4]
+    lconn[3, 4, 2] = lconn[3, 2, 4]
+    lconn[3, 4, 3] = lconn[3, 3, 4]
+    lconn[3, 4, 4] = -cth * sth * (rho23 + a2sth2 * rho2 * (r1 * (4.0 + r1) + a2cth2) + 2.0 * r1 * a4 * sth4) * irho23_dthdx2
+
+    lconn[4, 1, 1] = bhspin * fac1_rho23
+    lconn[4, 1, 2] = r1 * lconn[4, 1, 1]
+    lconn[4, 1, 3] = -2.0 * bhspin * r1 * cth * dthdx2 / (sth * rho22)
+    lconn[4, 1, 4] = -a2sth2 * fac1_rho23
+
+    lconn[4, 2, 1] = lconn[4, 1, 2]
+    lconn[4, 2, 2] = bhspin * r2 * fac1_rho23
+    lconn[4, 2, 3] = -2 * bhspin * r1 * (a2 + 2 * r1 * (2.0 + r1) + a2 * c2th) * cth * dthdx2 / (sth * fac2 * fac2)
+    lconn[4, 2, 4] = r1 * (r1 * rho22 - a2sth2 * fac1) * irho23
+
+    lconn[4, 3, 1] = lconn[4, 1, 3]
+    lconn[4, 3, 2] = lconn[4, 2, 3]
+    lconn[4, 3, 3] = -bhspin * r1 * dthdx22 * irho2
+    lconn[4, 3, 4] = dthdx2 * (0.25 * fac2 * fac2 * cth / sth + a2 * r1 * s2th) * irho22
+
+    lconn[4, 4, 1] = lconn[4, 1, 4]
+    lconn[4, 4, 2] = lconn[4, 2, 4]
+    lconn[4, 4, 3] = lconn[4, 3, 4]
+    lconn[4, 4, 4] = (-bhspin * r1sth2 * rho22 + a3 * sth4 * fac1) * irho23
+    return SArray(lconn)
 end
 
 function get_connection_analytic!(X::AbstractVector{T}, lconn::TTensor3D, bhspin) where T
