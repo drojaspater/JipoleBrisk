@@ -36,7 +36,7 @@ function radiating_region(X, Rh::Float64)
 end
 
 
-function GetTDBoundaryCondition(X::SVector{4, Float64}, Kcon::SVector{4, Float64}, a::Float64, Rh::Float64)
+function GetTDBoundaryCondition(X, Kcon, a::Float64, Rh::Float64)
     r, _ = bl_coord(X)
 
     if(r > Rh)

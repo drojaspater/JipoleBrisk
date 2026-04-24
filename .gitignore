@@ -6,6 +6,7 @@ scripts/*
 *.txt
 !Tables/ch24_vals.txt
 
+*.uvfits
 # BUT keep the license
 !License.txt
 /example_notebooks/*
@@ -15,7 +16,7 @@ scripts/*
 !example_notebooks/Autodiff.ipynb
 !example_notebooks/ComputeGeodesics.ipynb
 !example_notebooks/GenerateImageGRMHD.ipynb
-!example_notebooks/Generateimages.ipynb
+!example_notebooks/GenerateImages.ipynb
 
 # Generated figures
 *.png
@@ -25,3 +26,4 @@ scripts/*
 
 # Windows alternate data streams
 **/*:Zone.Identifier
+
