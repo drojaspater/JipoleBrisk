@@ -724,7 +724,7 @@ end
 
 
 
-function radiating_region(X::SVector{4, Float64}, Rh::Float64)
+function radiating_region(X, Rh::Float64)
     """
     Checks if the position is within the radiating region.
     Parameters:

@@ -90,7 +90,7 @@ function get_jk(X, Kcon, freq::Float64, bhspin, data, derivative_calculation::Va
 end
 
 
-function integrate_emission!(traj::Vector{OfTraj}, nsteps::Int, Image::Matrix{Float64}, I::Int, J::Int, freq::Float64, bhspin::Float64, data = nothing)
+function integrate_emission!(traj::Vector{OfTrajM}, nsteps::Int, Image::Matrix{Float64}, I::Int, J::Int, freq::Float64, bhspin::Float64, data = nothing)
     """
     Integrates the emission along the geodesic trajectory.
     

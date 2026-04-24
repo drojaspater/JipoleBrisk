@@ -31,7 +31,7 @@ function thindisk_region(Xi::MVec4, Xf::MVec4)::Bool
     em_region::Bool = (r_f > r_isco && r_f < Rout)
     return midplane && em_region
 end
-function radiating_region(X::SVector{4, Float64}, Rh::Float64)
+function radiating_region(X, Rh::Float64)
     return false
 end
 

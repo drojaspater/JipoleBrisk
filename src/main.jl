@@ -15,6 +15,19 @@ const TMMat4{T} = MMatrix{4,4,T,16}
 const Tensor3D = MArray{Tuple{4,4,4}, Float64, 3, 64}  # 4×4×4 mutable tensor
 const TTensor3D{T} = MArray{Tuple{4,4,4}, T, 3, 64}  # 4×4×4 mutable tensor
 
+mutable struct OfTrajM
+    dl::Float64
+    X::MVec4
+    Kcon::MVec4
+    Xhalf::MVec4
+    Kconhalf::MVec4
+    dX_dθo::MVec4
+    dK_dθo::MVec4
+    dX_da::MVec4
+    dK_da::MVec4
+end
+
+
 struct OfTraj
     dl::Float64
     X::SVector{4, Float64}

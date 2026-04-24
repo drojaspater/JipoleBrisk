@@ -153,7 +153,7 @@ function KrangGeoTracing(bhspin::Float64, θo::Float64, ro::Float64, fovx::Float
     return lines_ks
 end
 
-function get_pixel(traj::Vector{OfTraj}, i::Int, j::Int, Xcam::MVec4, maxnstep, fovx::Float64, fovy::Float64, freq::Float64, nx::Int64,ny::Int64, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64, xoff = 0, yoff = 0)
+function get_pixel(traj::Vector{OfTrajM}, i::Int, j::Int, Xcam::MVec4, maxnstep, fovx::Float64, fovy::Float64, freq::Float64, nx::Int64,ny::Int64, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64, xoff = 0, yoff = 0)
     """
     Evolves the geodesic for each pixel.
     Parameters:
@@ -199,7 +199,7 @@ function CalculateGeodesics(Xcam, fovx, fovy, freq_cgs, maxnstep, nx, ny, bhspin
     """
     Rh = 1 + sqrt(1. - bhspin * bhspin);  # Radius of the horizon
     #println("Utilizing $(Threads.nthreads()) threads for geodesic calculation.")
-    trajs = Matrix{Vector{OfTraj}}(undef, nx, ny)
+    trajs = Matrix{Vector{OfTrajM}}(undef, nx, ny)
     freq_unitless = freq_cgs * HPL/(ME * CL * CL)  # Convert frequency to unitless
 
 
@@ -793,7 +793,7 @@ function stop_backward_integration(X::MVec4, Kcon::MVec4, Rh::Float64, Rstop::Fl
 
     return 0
 end
-function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTraj}, step_max::Int, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
+function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, step_max::Int, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
     
     X = copy(Xi)
     Kcon = copy(Kconi)

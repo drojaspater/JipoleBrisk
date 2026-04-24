@@ -19,7 +19,7 @@ const RHO_unit = 3.e-18
 const U_unit = RHO_unit * CL^2  # Internal energy density unit in erg
 const B_unit = CL * sqrt(4 * π * RHO_unit)  # Magnetic field unit in Gauss
 
-function radiating_region(X::SVector{4, Float64}, Rh::Float64)
+function radiating_region(X, Rh::Float64)
     """
     Checks if the position is within the radiating region.
     Parameters:
