@@ -803,7 +803,7 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, 
     nstep = 1
     lconn = Tensor3D(undef)
     
-    # Kills photons permanently trapped on the photon sphere
+    # Kills photons permanently trapped
     ABSOLUTE_MAX = 50000 
     
     while (stop_backward_integration(X, Kcon, Rh, Rstop) == 0) && (nstep < ABSOLUTE_MAX)
@@ -816,7 +816,6 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, 
             new_len = old_len * 2
             resize!(traj, new_len)
             
-            # Initialize the new structs exactly as you did in the main script
             for k in (old_len + 1):new_len
                 traj[k] = OfTrajM(
                     0.0, 

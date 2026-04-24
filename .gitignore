@@ -16,7 +16,7 @@ scripts/*
 !example_notebooks/Autodiff.ipynb
 !example_notebooks/ComputeGeodesics.ipynb
 !example_notebooks/GenerateImageGRMHD.ipynb
-!example_notebooks/Generateimages.ipynb
+!example_notebooks/GenerateImages.ipynb
 
 # Generated figures
 *.png
