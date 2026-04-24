@@ -6,6 +6,7 @@ scripts/*
 *.txt
 !Tables/ch24_vals.txt
 
+*.uvfits
 # BUT keep the license
 !License.txt
 /example_notebooks/*
@@ -25,3 +26,4 @@ scripts/*
 
 # Windows alternate data streams
 **/*:Zone.Identifier
+

@@ -153,30 +153,23 @@ function KrangGeoTracing(bhspin::Float64, θo::Float64, ro::Float64, fovx::Float
     return lines_ks
 end
 
-function get_pixel(traj::Vector{OfTrajM}, i::Int, j::Int, Xcam::MVec4, maxnstep, fovx::Float64, fovy::Float64, freq::Float64, nx::Int64,ny::Int64, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64, xoff = 0, yoff = 0)
-    """
-    Evolves the geodesic for each pixel.
-    Parameters:
-    @i: x-index of the pixel in the image plane.
-    @j: y-index of the pixel in the image plane.
-    @Xcam: Position vector of the camera in internal coordinates.
-    @params: Parameters for the camera.
-    @fovx: Field of view in the x-direction.
-    @fovy: Field of view in the y-direction.
-    @freq: Frequency of the radiation.
-    """
+function get_pixel(traj::Vector{OfTrajM}, i::Int, j::Int, Xcam::MVec4, fovx::Float64, fovy::Float64, freq::Float64, nx::Int64, ny::Int64, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64, xoff = 0, yoff = 0)
+    
     X = MVec4(undef)
     Kcon = MVec4(undef)
 
-    init_XK!(X, Kcon, i, j, Xcam, nx,ny, fovx, fovy, bhspin, xoff, yoff)
+    init_XK!(X, Kcon, i, j, Xcam, nx, ny, fovx, fovy, bhspin, xoff, yoff)
+    
     for mu in 1:NDIM
         Kcon[mu] *= freq
     end
-    nstep = trace_geodesic(X, Kcon, traj, maxnstep, i, j, bhspin, Rh, Rout, Rstop)
+    
+    # We no longer need to pass maxnstep
+    nstep = trace_geodesic(X, Kcon, traj, i, j, bhspin, Rh, Rout, Rstop)
 
-
-    if nstep >= maxnstep - 1
-        @error "Max number of steps exceeded at pixel ($i, $j), nstep = $nstep"
+    # Update error check to match the ABSOLUTE_MAX in trace_geodesic
+    if nstep >= (50000 - 1)
+        @error "Photon orbit trapped at pixel ($i, $j). Reached absolute max of $nstep steps."
     end
 
     return nstep
@@ -793,7 +786,8 @@ function stop_backward_integration(X::MVec4, Kcon::MVec4, Rh::Float64, Rstop::Fl
 
     return 0
 end
-function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, step_max::Int, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
+
+function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
     
     X = copy(Xi)
     Kcon = copy(Kconi)
@@ -809,7 +803,29 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, step_max
     nstep = 1
     lconn = Tensor3D(undef)
     
-    while (stop_backward_integration(X, Kcon, Rh, Rstop) == 0) && (nstep < step_max)
+    # Kills photons permanently trapped on the photon sphere
+    ABSOLUTE_MAX = 50000 
+    
+    while (stop_backward_integration(X, Kcon, Rh, Rstop) == 0) && (nstep < ABSOLUTE_MAX)
+        
+        # Dynamic Resizing in case it's needed
+        # If we are about to exceed the current array length, double it
+        if nstep >= length(traj)
+            @warn "Trajectory array length exceeded at step $nstep. Doubling the array size from $(length(traj)) to $(length(traj)*2) at pixel ($i, $j)."
+            old_len = length(traj)
+            new_len = old_len * 2
+            resize!(traj, new_len)
+            
+            # Initialize the new structs exactly as you did in the main script
+            for k in (old_len + 1):new_len
+                traj[k] = OfTrajM(
+                    0.0, 
+                    MVec4(undef), MVec4(undef), MVec4(undef), MVec4(undef),
+                    MVec4(undef), MVec4(undef), MVec4(undef), MVec4(undef)
+                )
+            end
+        end
+
         dl = stepsize(X, Kcon, params.cstartx, params.cstopx)
 
         traj[nstep].dl = dl * L_unit * HPL / (ME * CL^2)
@@ -824,7 +840,6 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, step_max
         traj[nstep].Kcon .= Kcon
         traj[nstep].Xhalf .= Xhalf
         traj[nstep].Kconhalf .= Kconhalf
-        # The autodiff MVec4s are already initialized and waiting for you later!
     end
 
     return nstep
