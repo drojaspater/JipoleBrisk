@@ -21,10 +21,6 @@ mutable struct OfTrajM
     Kcon::MVec4
     Xhalf::MVec4
     Kconhalf::MVec4
-    dX_dθo::MVec4
-    dK_dθo::MVec4
-    dX_da::MVec4
-    dK_da::MVec4
 end
 
 

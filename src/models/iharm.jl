@@ -23,6 +23,7 @@ The data is stored in a dictionary where keys are the primitive names
 # end
 
 struct IharmData
+    t::Float64
     RHO::Array{Float64,3}
     UU::Array{Float64,3}
     U1::Array{Float64,3}
@@ -144,7 +145,6 @@ function read_header(filename::String)
 
     h5open(filename, "r") do file
         header = file["header"]
-        
         if haskey(header, "has_electrons")
             params.ELECTRONS = read(header, "has_electrons")
         else
@@ -383,6 +383,7 @@ function load_data(filename::String, trat_large::Float64,Nfiles::Int = 1)
 
 
     h5open(filename, "r") do file
+        t = read(file, "t")
         for n in 1:Nfiles
             Threads.@threads for prim_name in VALID_PRIMS
                 data_3d = _read_single_primitive(file, prim_name)
@@ -413,7 +414,7 @@ function load_data(filename::String, trat_large::Float64,Nfiles::Int = 1)
                     end
                 end
             end
-            data_array[n] = IharmData(rho, uu, u1, u2, u3, b1, b2, b3, zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)))            
+            data_array[n] = IharmData(t, rho, uu, u1, u2, u3, b1, b2, b3, zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)))            
         end
     end
 

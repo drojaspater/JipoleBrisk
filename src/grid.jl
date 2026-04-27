@@ -114,7 +114,6 @@ end
 #     return sum_val / 8.0
 # end
 
-
 function interp_scalar_time(X, dataA, dataB, tfac)
     vA = interp_scalar(X, dataA)
     if SLOW_LIGHT

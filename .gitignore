@@ -17,7 +17,7 @@ scripts/*
 !example_notebooks/ComputeGeodesics.ipynb
 !example_notebooks/GenerateImageGRMHD.ipynb
 !example_notebooks/GenerateImages.ipynb
-
+!example_notebooks/SlowLightGRMHD.ipynb
 # Generated figures
 *.png
 

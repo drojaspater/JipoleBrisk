@@ -164,15 +164,14 @@ function get_pixel(traj::Vector{OfTrajM}, i::Int, j::Int, Xcam::MVec4, fovx::Flo
         Kcon[mu] *= freq
     end
     
-    # We no longer need to pass maxnstep
-    nstep = trace_geodesic(X, Kcon, traj, i, j, bhspin, Rh, Rout, Rstop)
+    nstep, midplane_crossings = trace_geodesic(X, Kcon, traj, i, j, bhspin, Rh, Rout, Rstop)
 
     # Update error check to match the ABSOLUTE_MAX in trace_geodesic
     if nstep >= (50000 - 1)
         @error "Photon orbit trapped at pixel ($i, $j). Reached absolute max of $nstep steps."
     end
 
-    return nstep
+    return nstep, midplane_crossings
 end
 
 function CalculateGeodesics(Xcam, fovx, fovy, freq_cgs, maxnstep, nx, ny, bhspin, Rout, Rstop)
@@ -203,7 +202,7 @@ function CalculateGeodesics(Xcam, fovx, fovy, freq_cgs, maxnstep, nx, ny, bhspin
             trajs[i+1, j+1] = Vector{OfTraj}()
             sizehint!(trajs[i+1, j+1], maxnstep)
             
-            nstep = get_pixel(trajs[i+1, j+1], i, j, Xcam, maxnstep, fovx, fovy, freq_unitless, nx, ny, bhspin, Rh, Rout, Rstop)
+            nstep = get_pixel(trajs[i+1, j+1], i, j, Xcam, maxnstep, fovx, fovy, freq_unitless, nx, ny, bhspin, Rh, Rout, Rstop, midplane_crossings)
 
             resize!(trajs[i+1, j+1], length(trajs[i+1, j+1]))
         end
@@ -799,7 +798,16 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, 
     traj[1].Kcon .= Kconi
     traj[1].Xhalf .= Xi
     traj[1].Kconhalf .= Kconi
-    
+    midplane_crossings = 1
+
+    midplane_crossed = false
+
+
+    midplane_crossings = 0
+    _, th = bl_coord(Xi)
+    # 1 means up 0 means down
+    position_in_midplane = if(th > π/2) 1 else 0 end
+
     nstep = 1
     lconn = Tensor3D(undef)
     
@@ -819,7 +827,6 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, 
             for k in (old_len + 1):new_len
                 traj[k] = OfTrajM(
                     0.0, 
-                    MVec4(undef), MVec4(undef), MVec4(undef), MVec4(undef),
                     MVec4(undef), MVec4(undef), MVec4(undef), MVec4(undef)
                 )
             end
@@ -828,7 +835,18 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, 
         dl = stepsize(X, Kcon, params.cstartx, params.cstopx)
 
         traj[nstep].dl = dl * L_unit * HPL / (ME * CL^2)
-
+        _,th = bl_coord(X)
+        
+        if (position_in_midplane == 1) && (th <= π/2)
+            midplane_crossed = true
+            position_in_midplane = 0
+            midplane_crossings += 1
+        elseif (position_in_midplane == 0) && (th > π/2)
+            midplane_crossed = true
+            position_in_midplane = 1
+            midplane_crossings += 1
+        end
+        
         push_photon!(X, Kcon, -dl, Xhalf, Kconhalf, lconn, bhspin)
 
         nstep += 1
@@ -841,7 +859,7 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, 
         traj[nstep].Kconhalf .= Kconhalf
     end
 
-    return nstep
+    return nstep , midplane_crossings
 end
 
 
