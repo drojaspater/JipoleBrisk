@@ -739,7 +739,7 @@ function stop_backward_integration(X::MVec4, Kcon::MVec4, Rh::Float64, Rstop::Fl
     @X: Position vector of the photon in internal coordinates.
     @Kcon: Covariant 4-vector of the photon in internal coordinates.
     """
-    if (((X[2] > log(Rstop)) && (Kcon[2] < 0.0)) || (X[2] < log(Rh+ 0.0001)))
+    if (((X[2] > log(params.rmax_geo)) && (Kcon[2] < 0.0)) || (X[2] < log(Rh+ 0.0001)))
         return 1
     end
 
@@ -759,7 +759,6 @@ function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, 
     traj[1].Xhalf .= Xi
     traj[1].Kconhalf .= Kconi
     midplane_crossings = 1
-
     midplane_crossed = false
 
 

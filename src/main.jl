@@ -24,6 +24,7 @@ mutable struct OfTrajM
 end
 
 
+    
 struct OfTraj
     dl::Float64
     X::SVector{4, Float64}
@@ -50,6 +51,11 @@ include("radiation.jl")
 include("maxwell_juettner.jl")
 include("grid.jl")
 include("./models/$(MODEL).jl")
+
+if(SLOW_LIGHT)
+    println("Adding slowlight.jl file...")
+    include("./slowlight.jl")
+end
 
 include("geodesics.jl")
 include("autodiff.jl")

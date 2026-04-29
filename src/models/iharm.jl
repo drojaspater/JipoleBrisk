@@ -359,17 +359,18 @@ function _read_single_primitive(file_handle, prim_name::String)
 end
 
 
-function load_data(filename::String, trat_large::Float64,Nfiles::Int = 1)
+function load_data(filename::String, trat_large::Float64)
     println("Loading data from '$filename' into 'iharm' module...")
     !isfile(filename) && error("File not found: $filename")
 
     # Temporary variables to store primitives
     rho = uu = u1 = u2 = u3 = b1 = b2 = b3 = nothing
 
-    #Nfiles will be useful when using SLOW_LIGHT later on, for now we just load one file
-    data_array = Vector{IharmData}(undef, Nfiles)
+    #this is stupid, change this afterwards
+    data_array = Vector{IharmData}(undef, 1)
+    
 
-
+    
     #Rescale mdot
     rescale_factor = 1.;
     target_mdot = 0; #TODO: THIS HAS TO BE READ FROM INPUT OR PLACED SOMEWHERE ELSE
@@ -384,99 +385,95 @@ function load_data(filename::String, trat_large::Float64,Nfiles::Int = 1)
 
     h5open(filename, "r") do file
         t = read(file, "t")
-        for n in 1:Nfiles
-            Threads.@threads for prim_name in VALID_PRIMS
-                data_3d = _read_single_primitive(file, prim_name)
-                if data_3d !== nothing
-                    data_3d = Float64.(data_3d)  # ensure Float64
+        Threads.@threads for prim_name in VALID_PRIMS
+            data_3d = _read_single_primitive(file, prim_name)
+            if data_3d !== nothing
+                data_3d = Float64.(data_3d)  # ensure Float64
 
-                    # Assign to the correct struct field
-                    if prim_name == "RHO"
-                        rho = data_3d
-                        if(size(rho,1) != params.N1 || size(rho,2) != params.N2 || size(rho,3) != params.N3)
-                            println("N1 = $(size(rho,1)), N2 = $(size(rho,2)), N3 = $(size(rho,3))")
-                            error("Data dimensions do not match expected grid size N1,N2,N3")
-                        end
-                    elseif prim_name == "UU"
-                        uu = data_3d
-                    elseif prim_name == "U1"
-                        u1 = data_3d
-                    elseif prim_name == "U2"
-                        u2 = data_3d
-                    elseif prim_name == "U3"
-                        u3 = data_3d
-                    elseif prim_name == "B1"
-                        b1 = data_3d
-                    elseif prim_name == "B2"
-                        b2 = data_3d
-                    elseif prim_name == "B3"
-                        b3 = data_3d
+                # Assign to the correct struct field
+                if prim_name == "RHO"
+                    rho = data_3d
+                    if(size(rho,1) != params.N1 || size(rho,2) != params.N2 || size(rho,3) != params.N3)
+                        println("N1 = $(size(rho,1)), N2 = $(size(rho,2)), N3 = $(size(rho,3))")
+                        error("Data dimensions do not match expected grid size N1,N2,N3")
                     end
+                elseif prim_name == "UU"
+                    uu = data_3d
+                elseif prim_name == "U1"
+                    u1 = data_3d
+                elseif prim_name == "U2"
+                    u2 = data_3d
+                elseif prim_name == "U3"
+                    u3 = data_3d
+                elseif prim_name == "B1"
+                    b1 = data_3d
+                elseif prim_name == "B2"
+                    b2 = data_3d
+                elseif prim_name == "B3"
+                    b3 = data_3d
                 end
             end
-            data_array[n] = IharmData(t, rho, uu, u1, u2, u3, b1, b2, b3, zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)))            
         end
+        data_array[1] = IharmData(t, rho, uu, u1, u2, u3, b1, b2, b3, zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)), zeros(size(rho)))            
     end
 
     #println("Primitives successfully loaded. Dimensions: ", size(rho))
     #println("Calculating physical quantities...")
-    for n in 1:Nfiles
-        Threads.@threads for i in 1:(params.N1)
-            for j in 1:(params.N2)
-                X::MVec4 = zeros(MVec4)
-                ijktoX(i-1, j-1, 0, X)
-                gcov::MMat4 = zeros(MMat4)
-                gcon::MMat4 = zeros(MMat4)
-                gcov_func!(X, params.a, gcov)
-                gcon_func!(gcov, gcon)
-                g = gdet_zone(i-1, j-1, 0)
+    Threads.@threads for i in 1:(params.N1)
+        for j in 1:(params.N2)
+            X::MVec4 = zeros(MVec4)
+            ijktoX(i-1, j-1, 0, X)
+            gcov::MMat4 = zeros(MMat4)
+            gcon::MMat4 = zeros(MMat4)
+            gcov_func!(X, params.a, gcov)
+            gcon_func!(gcov, gcon)
+            g = gdet_zone(i-1, j-1, 0)
 
-                for k in 1:(params.N3)
-                    ijktoX(i-1, j-1, k, X)
+            for k in 1:(params.N3)
+                ijktoX(i-1, j-1, k, X)
 
-                    Ufields = (data_array[n].U1, data_array[n].U2, data_array[n].U3)
-                    UdotU = 0.0
-                    for l in 1:(NDIM -1)       # l = 1,2,3 corresponds to U1,U2,U3
-                        for m in 1:(NDIM -1)
-                            UdotU += gcov[l+1, m+1] * Ufields[l][i,j,k] * Ufields[m][i,j,k]
-                        end
+                Ufields = (data_array[1].U1, data_array[1].U2, data_array[1].U3)
+                UdotU = 0.0
+                for l in 1:(NDIM -1)       # l = 1,2,3 corresponds to U1,U2,U3
+                    for m in 1:(NDIM -1)
+                        UdotU += gcov[l+1, m+1] * Ufields[l][i,j,k] * Ufields[m][i,j,k]
                     end
-
-                    ufac = sqrt(-1. / gcon[1,1] * (1. + abs(UdotU)))
-                    ucon::MVec4 = MVec4(undef)
-                    ucon[1] = -ufac * gcon[1,1]
-
-                    for μ in 1:(NDIM-1)
-                        ucon[μ + 1] = Ufields[μ][i,j,k] - ufac * gcon[1, μ+1]
-                    end
-                    
-                    ucov::MVec4 = MVec4(undef)
-                    flip_index!(ucov, ucon, gcov)
-                    udotB = 0.0
-                    Bfields = (data_array[n].B1, data_array[n].B2, data_array[n].B3)
-                    for l in 1:(NDIM -1)
-                        udotB += ucov[l+1] * Bfields[l][i,j,k]
-                    end
-
-                    bcon::MVec4 = MVec4(undef)
-                    bcon[1] = udotB
-                    for μ in 1:(NDIM-1)
-                        bcon[μ+1] = (Bfields[μ][i,j,k] + ucon[μ+1] * udotB) / ucon[1]
-                    end
-                    bcov = MVec4(undef)
-                    flip_index!(bcov, bcon, gcov)
-
-                    bsq = 0.0
-                    for l in 1:NDIM
-                        bsq += bcov[l] * bcon[l]
-                    end
-                    data_array[n].b[i,j,k] = sqrt(bsq) * B_unit  # Magnetic field strength
-
                 end
+
+                ufac = sqrt(-1. / gcon[1,1] * (1. + abs(UdotU)))
+                ucon::MVec4 = MVec4(undef)
+                ucon[1] = -ufac * gcon[1,1]
+
+                for μ in 1:(NDIM-1)
+                    ucon[μ + 1] = Ufields[μ][i,j,k] - ufac * gcon[1, μ+1]
+                end
+                
+                ucov::MVec4 = MVec4(undef)
+                flip_index!(ucov, ucon, gcov)
+                udotB = 0.0
+                Bfields = (data_array[1].B1, data_array[1].B2, data_array[1].B3)
+                for l in 1:(NDIM -1)
+                    udotB += ucov[l+1] * Bfields[l][i,j,k]
+                end
+
+                bcon::MVec4 = MVec4(undef)
+                bcon[1] = udotB
+                for μ in 1:(NDIM-1)
+                    bcon[μ+1] = (Bfields[μ][i,j,k] + ucon[μ+1] * udotB) / ucon[1]
+                end
+                bcov = MVec4(undef)
+                flip_index!(bcov, bcon, gcov)
+
+                bsq = 0.0
+                for l in 1:NDIM
+                    bsq += bcov[l] * bcon[l]
+                end
+                data_array[1].b[i,j,k] = sqrt(bsq) * B_unit  # Magnetic field strength
+
             end
         end
-        init_physical_quantities(data_array, n, rescale_factor, trat_large)  # Initialize physical quantities for the first dataset
     end
+    init_physical_quantities(data_array, 1, rescale_factor, trat_large)  # Initialize physical quantities for the first dataset
 
     # Check if all fields were loaded
     fields = [rho, uu, u1, u2, u3, b1, b2, b3]
@@ -486,7 +483,11 @@ function load_data(filename::String, trat_large::Float64,Nfiles::Int = 1)
         println("All primitives successfully loaded. Dimensions: ", size(rho))
     end
 
-    return data_array
+    #update the dump path for slow light if needed
+    if(SLOW_LIGHT)
+        params_slowlight.current_dumps_path = update_dump_path()
+    end
+    return data_array[1]
 end
 
 
@@ -561,9 +562,7 @@ function get_model_sigma(X, data)
     if (X_in_domain(X) == 0)
         return 0.0
     end
-    tfac = 0.0 #TODO: when using slowlight, we should implement this
-    nA = 1
-    nB = 1
+    nA, nB, tfac = set_tinterp_ns(X, data)
 
     return interp_scalar_time(X, data[nA].sigma, data[nB].sigma, tfac)
 end
@@ -600,9 +599,7 @@ function get_model_ne(X, data)
         sigma_smoothfac = get_sigma_smoothfac(sigma)
     end
 
-    nA = 1
-    nB = 1
-    tfac = 0.0 #TODO: when using slowlight, we should implement this
+    nA, nB, tfac = set_tinterp_ns(X, data)
     return interp_scalar_time(X, data[nA].ne, data[nB].ne, tfac) * sigma_smoothfac
 end
 
@@ -628,10 +625,7 @@ function get_model_thetae(X, data)
     if(X_in_domain(X) == 0)
         return 0.0
     end
-    nA = 1
-    nB = 1
-    tfac = 0.0 #TODO: when using slowlight, we should implement this
-
+    nA, nB, tfac = set_tinterp_ns(X, data)
     return interp_scalar_time(X, data[nA].θe, data[nB].θe, tfac)
 end
 
@@ -639,10 +633,7 @@ function get_model_thetae_deriv(X, data)
     if(X_in_domain(X) == 0)
         return 0.0
     end
-    nA = 1
-    nB = 1
-    tfac = 0.0 #TODO: when using slowlight, we should implement this
-
+    nA, nB, tfac = set_tinterp_ns(X, data)
     return interp_scalar_time(X, data[nA].dθedRhi, data[nB].dθedRhi, tfac)
 end
 
@@ -650,10 +641,7 @@ function get_model_b(X, data)
     if(X_in_domain(X) == 0)
         return 0.0
     end
-    nA = 1
-    nB = 1
-    tfac = 0.0 #TODO: when using slowlight, we should implement this
-
+    nA, nB, tfac = set_tinterp_ns(X, data)
     return interp_scalar_time(X, data[nA].b, data[nB].b, tfac)
 end
 
@@ -682,9 +670,7 @@ end
         return
     end
     Vcon = similar(X)
-    tfac, _, _ = set_tinterp_ns(X)
-    nA = 1 #TODO: when using slowlight, we should implement this
-    nB = 1 #TODO: when using slowlight, we should implement this
+    nA, nB, tfac = set_tinterp_ns(X, data)
     Vcon[2] = interp_scalar_time(X, data[nA].U1, data[nB].U1, tfac);
     Vcon[3] = interp_scalar_time(X, data[nA].U2, data[nB].U2, tfac);
     Vcon[4] = interp_scalar_time(X, data[nA].U3, data[nB].U3, tfac);
