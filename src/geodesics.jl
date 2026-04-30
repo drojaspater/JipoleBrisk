@@ -153,22 +153,42 @@ function KrangGeoTracing(bhspin::Float64, θo::Float64, ro::Float64, fovx::Float
     return lines_ks
 end
 
-function get_pixel(traj::Vector{OfTrajM}, i::Int, j::Int, Xcam::MVec4, fovx::Float64, fovy::Float64, freq::Float64, nx::Int64, ny::Int64, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64, xoff = 0, yoff = 0)
+# function get_pixel(traj::Vector{OfTrajM}, i::Int, j::Int, Xcam::MVec4, fovx::Float64, fovy::Float64, freq::Float64, nx::Int64, ny::Int64, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64, xoff = 0, yoff = 0)
     
-    X = MVec4(undef)
-    Kcon = MVec4(undef)
+#     X = MVec4(undef)
+#     Kcon = MVec4(undef)
 
-    init_XK!(X, Kcon, i, j, Xcam, nx, ny, fovx, fovy, bhspin, xoff, yoff)
+#     init_XK!(X, Kcon, i, j, Xcam, nx, ny, fovx, fovy, bhspin, xoff, yoff)
     
-    for mu in 1:NDIM
-        Kcon[mu] *= freq
-    end
+#     for mu in 1:NDIM
+#         Kcon[mu] *= freq
+#     end
+    
+#     nstep, midplane_crossings = trace_geodesic(X, Kcon, traj, i, j, bhspin, Rh, Rout, Rstop)
+
+#     # Update error check to match the ABSOLUTE_MAX in trace_geodesic
+#     if nstep >= (50000 - 1)
+#         @error "Photon orbit trapped at pixel ($i, $j). Reached absolute max of $nstep steps."
+#     end
+
+#     return nstep, midplane_crossings
+# end
+
+
+function get_pixel(traj::Vector{OfTrajS}, i::Int, j::Int, Xcam::MVec4, fovx::Float64, fovy::Float64, freq::Float64, nx::Int64, ny::Int64, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64, xoff = 0, yoff = 0)
+    
+    X_mut = MVec4(undef)
+    Kcon_mut = MVec4(undef)
+
+    init_XK!(X_mut, Kcon_mut, i, j, Xcam, nx, ny, fovx, fovy, bhspin, xoff, yoff)
+    
+    X = SVector{4, Float64}(X_mut)
+    Kcon = SVector{4, Float64}(Kcon_mut) * freq
     
     nstep, midplane_crossings = trace_geodesic(X, Kcon, traj, i, j, bhspin, Rh, Rout, Rstop)
 
-    # Update error check to match the ABSOLUTE_MAX in trace_geodesic
     if nstep >= (50000 - 1)
-        @error "Photon orbit trapped at pixel ($i, $j). Reached absolute max of $nstep steps."
+        @error "Photon orbit trapped at pixel ($i, $j). Reached max $nstep steps."
     end
 
     return nstep, midplane_crossings
@@ -568,66 +588,105 @@ end
     end
 end
 
-
-Base.@inline function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
-    """
-    Pushes the photon geodesic forward/backwards by a step size dl/-dl using the analytic connection coefficients.
-    Parameters:
-    @X: Position vector of the photon in internal coordinates.
-    @Kcon: Covariant 4-vector of the photon in internal coordinates.
-    @dl: Step size for the geodesic integration.
-    @Xhalf: Position vector of the photon at the half-step.
-    @Kconhalf: Covariant 4-vector of the photon at the half-step.
-    """
-
-    dKcon::Float64 = 0.0
-
-    if(MODEL == "analytic" || MODEL == "thin_disk")
-        #Use analytic connection
-        get_connection_analytic!(X, lconn, bhspin)
-    elseif(MODEL == "iharm")
-        #get_connection(X, bhspin, lconn)
-        get_connection_analytic!(X, lconn, bhspin)
-
-    else
-        error("Unknown model: $MODEL")
-    end 
-
-    @inbounds for k in 1:NDIM
-        @inbounds for i in 1:NDIM
-            @inbounds for j in 1:NDIM
-                dKcon -= 0.5 * dl * lconn[k, i, j] * Kcon[i] * Kcon[j]
-            end
-        end
-        Kconhalf[k] = Kcon[k] + dKcon
-        Xhalf[k] = X[k] + 0.5 * dl * Kcon[k]
-        dKcon = 0.0
+# Helper function to unroll the tensor contraction purely for SVectors
+@inline function compute_dKcon(dl::Float64, lconn::Tensor3D, Kcon::SVector{4, Float64})
+    dK1 = dK2 = dK3 = dK4 = 0.0
+    @inbounds for i in 1:4, j in 1:4
+        term = Kcon[i] * Kcon[j] * dl
+        dK1 -= lconn[1, i, j] * term
+        dK2 -= lconn[2, i, j] * term
+        dK3 -= lconn[3, i, j] * term
+        dK4 -= lconn[4, i, j] * term
     end
-        
-    if(MODEL == "analytic" || MODEL == "thin_disk")
-        #Use analytic connection
-        get_connection_analytic!(Xhalf, lconn, bhspin)
-    elseif(MODEL == "iharm")
-        #get_connection(Xhalf, bhspin, lconn)
-        get_connection_analytic!(Xhalf, lconn, bhspin)
-
-    else
-        error("Unknown model: $MODEL")
-    end 
-
-    dKcon = 0.0
-
-    @inbounds for k in 1:NDIM
-        @inbounds for i in 1:NDIM
-            @inbounds for j in 1:NDIM
-                dKcon -= dl * lconn[k, i, j] * Kconhalf[i] * Kconhalf[j]
-            end
-        end
-        Kcon[k] += dKcon
-        X[k] += dl * Kconhalf[k]
-        dKcon = 0.0
-    end
+    return SVector{4, Float64}(dK1, dK2, dK3, dK4)
 end
+
+Base.@inline function push_photon(X::SVector{4, Float64}, Kcon::SVector{4, Float64}, dl::Float64, lconn::Tensor3D, bhspin::Float64)
+    # lconn remains a mutable scratchpad tensor to avoid rewriting get_connection_analytic!
+    if MODEL == "analytic" || MODEL == "thin_disk" || MODEL == "iharm"
+        get_connection_analytic!(X, lconn, bhspin)
+    else
+        error("Unknown model: $MODEL")
+    end 
+
+    # Half step calculation
+    dKcon_half = compute_dKcon(0.5 * dl, lconn, Kcon)
+    Kconhalf = Kcon + dKcon_half
+    Xhalf = X + (0.5 * dl) * Kcon
+        
+    if MODEL == "analytic" || MODEL == "thin_disk" || MODEL == "iharm"
+        get_connection_analytic!(Xhalf, lconn, bhspin)
+    end 
+
+    # Full step calculation
+    dKcon_full = compute_dKcon(dl, lconn, Kconhalf)
+    new_Kcon = Kcon + dKcon_full
+    new_X = X + dl * Kconhalf
+
+    # Return the new static vectors
+    return new_X, new_Kcon, Xhalf, Kconhalf
+end
+
+
+# Base.@inline function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
+#     """
+#     Pushes the photon geodesic forward/backwards by a step size dl/-dl using the analytic connection coefficients.
+#     Parameters:
+#     @X: Position vector of the photon in internal coordinates.
+#     @Kcon: Covariant 4-vector of the photon in internal coordinates.
+#     @dl: Step size for the geodesic integration.
+#     @Xhalf: Position vector of the photon at the half-step.
+#     @Kconhalf: Covariant 4-vector of the photon at the half-step.
+#     """
+
+#     dKcon::Float64 = 0.0
+
+#     if(MODEL == "analytic" || MODEL == "thin_disk")
+#         #Use analytic connection
+#         get_connection_analytic!(X, lconn, bhspin)
+#     elseif(MODEL == "iharm")
+#         #get_connection(X, bhspin, lconn)
+#         get_connection_analytic!(X, lconn, bhspin)
+
+#     else
+#         error("Unknown model: $MODEL")
+#     end 
+
+#     @inbounds for k in 1:NDIM
+#         @inbounds for i in 1:NDIM
+#             @inbounds for j in 1:NDIM
+#                 dKcon -= 0.5 * dl * lconn[k, i, j] * Kcon[i] * Kcon[j]
+#             end
+#         end
+#         Kconhalf[k] = Kcon[k] + dKcon
+#         Xhalf[k] = X[k] + 0.5 * dl * Kcon[k]
+#         dKcon = 0.0
+#     end
+        
+#     if(MODEL == "analytic" || MODEL == "thin_disk")
+#         #Use analytic connection
+#         get_connection_analytic!(Xhalf, lconn, bhspin)
+#     elseif(MODEL == "iharm")
+#         #get_connection(Xhalf, bhspin, lconn)
+#         get_connection_analytic!(Xhalf, lconn, bhspin)
+
+#     else
+#         error("Unknown model: $MODEL")
+#     end 
+
+#     dKcon = 0.0
+
+#     @inbounds for k in 1:NDIM
+#         @inbounds for i in 1:NDIM
+#             @inbounds for j in 1:NDIM
+#                 dKcon -= dl * lconn[k, i, j] * Kconhalf[i] * Kconhalf[j]
+#             end
+#         end
+#         Kcon[k] += dKcon
+#         X[k] += dl * Kconhalf[k]
+#         dKcon = 0.0
+#     end
+# end
 
 const DEL = 1.e-6
 function get_connection(X::AbstractVector{T}, bhspin, conn::TTensor3D) where T
@@ -685,7 +744,7 @@ function get_connection(X::AbstractVector{T}, bhspin, conn::TTensor3D) where T
 end
 
 
-function stepsize(X::MVec4, Kcon::MVec4, cstartx::MVec4, cstopx::MVec4, eps_ipole::Float64 = 0.01)
+function stepsize(X, Kcon, cstartx::MVec4, cstopx::MVec4, eps_ipole::Float64 = 0.01)
     """
     Computes the step size for the geodesic integration based on the position and covariant 4-vector.
     Parameters:
@@ -732,7 +791,7 @@ function stepsize(X::MVec4, Kcon::MVec4, cstartx::MVec4, cstopx::MVec4, eps_ipol
 end
 
 
-function stop_backward_integration(X::MVec4, Kcon::MVec4, Rh::Float64, Rstop::Float64)
+function stop_backward_integration(X, Kcon, Rh::Float64, Rstop::Float64)
     """
     Checks if the backward integration should stop based on the position and covariant 4-vector.
     Parameters:
@@ -746,79 +805,133 @@ function stop_backward_integration(X::MVec4, Kcon::MVec4, Rh::Float64, Rstop::Fl
     return 0
 end
 
-function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
+# function trace_geodesic(Xi::MVec4, Kconi::MVec4, traj::Vector{OfTrajM}, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
     
-    X = copy(Xi)
-    Kcon = copy(Kconi)
-    Xhalf = copy(Xi)
-    Kconhalf = copy(Kconi)
+#     X = copy(Xi)
+#     Kcon = copy(Kconi)
+#     Xhalf = copy(Xi)
+#     Kconhalf = copy(Kconi)
 
-    traj[1].dl = 0.0
-    traj[1].X .= Xi
-    traj[1].Kcon .= Kconi
-    traj[1].Xhalf .= Xi
-    traj[1].Kconhalf .= Kconi
-    midplane_crossings = 1
-    midplane_crossed = false
+#     traj[1].dl = 0.0
+#     traj[1].X .= Xi
+#     traj[1].Kcon .= Kconi
+#     traj[1].Xhalf .= Xi
+#     traj[1].Kconhalf .= Kconi
+#     midplane_crossings = 1
+#     midplane_crossed = false
 
+
+#     midplane_crossings = 0
+#     _, th = bl_coord(Xi)
+#     # 1 means up 0 means down
+#     position_in_midplane = if(th > π/2) 1 else 0 end
+
+#     nstep = 1
+#     lconn = Tensor3D(undef)
+    
+#     # Kills photons permanently trapped
+#     ABSOLUTE_MAX = 50000 
+    
+#     while (stop_backward_integration(X, Kcon, Rh, Rstop) == 0) && (nstep < ABSOLUTE_MAX)
+        
+#         # Dynamic Resizing in case it's needed
+#         # If we are about to exceed the current array length, double it
+#         if nstep >= length(traj)
+#             @warn "Trajectory array length exceeded at step $nstep. Doubling the array size from $(length(traj)) to $(length(traj)*2) at pixel ($i, $j)."
+#             old_len = length(traj)
+#             new_len = old_len * 2
+#             resize!(traj, new_len)
+            
+#             for k in (old_len + 1):new_len
+#                 traj[k] = OfTrajM(
+#                     0.0, 
+#                     MVec4(undef), MVec4(undef), MVec4(undef), MVec4(undef)
+#                 )
+#             end
+#         end
+
+#         dl = stepsize(X, Kcon, params.cstartx, params.cstopx)
+
+#         traj[nstep].dl = dl * L_unit * HPL / (ME * CL^2)
+#         _,th = bl_coord(X)
+        
+#         if (position_in_midplane == 1) && (th <= π/2)
+#             midplane_crossed = true
+#             position_in_midplane = 0
+#             midplane_crossings += 1
+#         elseif (position_in_midplane == 0) && (th > π/2)
+#             midplane_crossed = true
+#             position_in_midplane = 1
+#             midplane_crossings += 1
+#         end
+        
+#         push_photon!(X, Kcon, -dl, Xhalf, Kconhalf, lconn, bhspin)
+
+#         nstep += 1
+        
+#         # Write directly into the next pre-allocated index
+#         traj[nstep].dl = dl
+#         traj[nstep].X .= X
+#         traj[nstep].Kcon .= Kcon
+#         traj[nstep].Xhalf .= Xhalf
+#         traj[nstep].Kconhalf .= Kconhalf
+#     end
+
+#     return nstep , midplane_crossings
+# end
+
+
+function trace_geodesic(Xi::SVector{4, Float64}, Kconi::SVector{4, Float64}, traj::Vector{OfTrajS}, i::Int, j::Int, bhspin::Float64, Rh::Float64, Rout::Float64, Rstop::Float64)
+    
+    X = Xi
+    Kcon = Kconi
+
+    traj[1] = OfTrajS(0.0, Xi, Kconi, Xi, Kconi)
 
     midplane_crossings = 0
     _, th = bl_coord(Xi)
-    # 1 means up 0 means down
-    position_in_midplane = if(th > π/2) 1 else 0 end
+    position_in_midplane = th > π/2 ? 1 : 0
 
     nstep = 1
     lconn = Tensor3D(undef)
-    
-    # Kills photons permanently trapped
     ABSOLUTE_MAX = 50000 
     
     while (stop_backward_integration(X, Kcon, Rh, Rstop) == 0) && (nstep < ABSOLUTE_MAX)
-        
+
         # Dynamic Resizing in case it's needed
         # If we are about to exceed the current array length, double it
         if nstep >= length(traj)
-            @warn "Trajectory array length exceeded at step $nstep. Doubling the array size from $(length(traj)) to $(length(traj)*2) at pixel ($i, $j)."
-            old_len = length(traj)
-            new_len = old_len * 2
-            resize!(traj, new_len)
-            
-            for k in (old_len + 1):new_len
-                traj[k] = OfTrajM(
-                    0.0, 
-                    MVec4(undef), MVec4(undef), MVec4(undef), MVec4(undef)
-                )
+            @warn "Trajectory array length exceeded at pixel ($i, $j)."
+            resize!(traj, length(traj) * 2)
+
+            dummy = @SVector zeros(4)
+            for k in (nstep+1):length(traj)
+                traj[k] = OfTrajS(0.0, dummy, dummy, dummy, dummy)
             end
         end
 
         dl = stepsize(X, Kcon, params.cstartx, params.cstopx)
-
-        traj[nstep].dl = dl * L_unit * HPL / (ME * CL^2)
-        _,th = bl_coord(X)
+        unit_dl = dl * L_unit * HPL / (ME * CL^2)
         
+        _, th = bl_coord(X)
         if (position_in_midplane == 1) && (th <= π/2)
-            midplane_crossed = true
             position_in_midplane = 0
             midplane_crossings += 1
         elseif (position_in_midplane == 0) && (th > π/2)
-            midplane_crossed = true
             position_in_midplane = 1
             midplane_crossings += 1
         end
         
-        push_photon!(X, Kcon, -dl, Xhalf, Kconhalf, lconn, bhspin)
+        new_X, new_Kcon, Xhalf, Kconhalf = push_photon(X, Kcon, -dl, lconn, bhspin)
 
         nstep += 1
         
-        # Write directly into the next pre-allocated index
-        traj[nstep].dl = dl
-        traj[nstep].X .= X
-        traj[nstep].Kcon .= Kcon
-        traj[nstep].Xhalf .= Xhalf
-        traj[nstep].Kconhalf .= Kconhalf
+        traj[nstep] = OfTrajS(unit_dl, new_X, new_Kcon, Xhalf, Kconhalf)
+        
+        # Update current positions
+        X = new_X
+        Kcon = new_Kcon
     end
 
-    return nstep , midplane_crossings
+    return nstep, midplane_crossings
 end
-
-

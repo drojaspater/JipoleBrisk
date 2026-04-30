@@ -598,7 +598,6 @@ function get_model_ne(X, data)
         end
         sigma_smoothfac = get_sigma_smoothfac(sigma)
     end
-
     nA, nB, tfac = set_tinterp_ns(X, data)
     return interp_scalar_time(X, data[nA].ne, data[nB].ne, tfac) * sigma_smoothfac
 end

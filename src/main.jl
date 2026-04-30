@@ -23,6 +23,13 @@ mutable struct OfTrajM
     Kconhalf::MVec4
 end
 
+struct OfTrajS
+    dl::Float64
+    X::SVector{4, Float64}
+    Kcon::SVector{4, Float64}
+    Xhalf::SVector{4, Float64}
+    Kconhalf::SVector{4, Float64}
+end
 
     
 struct OfTraj
