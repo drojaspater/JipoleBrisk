@@ -588,7 +588,6 @@ end
     end
 end
 
-# Helper function to unroll the tensor contraction purely for SVectors
 @inline function compute_dKcon(dl::Float64, lconn::Tensor3D, Kcon::SVector{4, Float64})
     dK1 = dK2 = dK3 = dK4 = 0.0
     @inbounds for i in 1:4, j in 1:4
@@ -602,14 +601,12 @@ end
 end
 
 Base.@inline function push_photon(X::SVector{4, Float64}, Kcon::SVector{4, Float64}, dl::Float64, lconn::Tensor3D, bhspin::Float64)
-    # lconn remains a mutable scratchpad tensor to avoid rewriting get_connection_analytic!
     if MODEL == "analytic" || MODEL == "thin_disk" || MODEL == "iharm"
         get_connection_analytic!(X, lconn, bhspin)
     else
         error("Unknown model: $MODEL")
     end 
 
-    # Half step calculation
     dKcon_half = compute_dKcon(0.5 * dl, lconn, Kcon)
     Kconhalf = Kcon + dKcon_half
     Xhalf = X + (0.5 * dl) * Kcon
@@ -618,12 +615,10 @@ Base.@inline function push_photon(X::SVector{4, Float64}, Kcon::SVector{4, Float
         get_connection_analytic!(Xhalf, lconn, bhspin)
     end 
 
-    # Full step calculation
     dKcon_full = compute_dKcon(dl, lconn, Kconhalf)
     new_Kcon = Kcon + dKcon_full
     new_X = X + dl * Kconhalf
 
-    # Return the new static vectors
     return new_X, new_Kcon, Xhalf, Kconhalf
 end
 
@@ -912,7 +907,9 @@ function trace_geodesic(Xi::SVector{4, Float64}, Kconi::SVector{4, Float64}, tra
 
         dl = stepsize(X, Kcon, params.cstartx, params.cstopx)
         unit_dl = dl * L_unit * HPL / (ME * CL^2)
-        
+
+        traj[nstep] = OfTrajS(unit_dl, traj[nstep].X, traj[nstep].Kcon, traj[nstep].Xhalf, traj[nstep].Kconhalf)
+
         _, th = bl_coord(X)
         if (position_in_midplane == 1) && (th <= π/2)
             position_in_midplane = 0
@@ -926,9 +923,9 @@ function trace_geodesic(Xi::SVector{4, Float64}, Kconi::SVector{4, Float64}, tra
 
         nstep += 1
         
-        traj[nstep] = OfTrajS(unit_dl, new_X, new_Kcon, Xhalf, Kconhalf)
+        #traj[nstep] = OfTrajS(unit_dl, new_X, new_Kcon, Xhalf, Kconhalf)
+        traj[nstep] = OfTrajS(0.0, new_X, new_Kcon, Xhalf, Kconhalf)
         
-        # Update current positions
         X = new_X
         Kcon = new_Kcon
     end

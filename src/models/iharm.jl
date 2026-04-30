@@ -602,23 +602,24 @@ function get_model_ne(X, data)
     return interp_scalar_time(X, data[nA].ne, data[nB].ne, tfac) * sigma_smoothfac
 end
 
-function set_tinterp_ns(X)
-    """
-    How far have we interpolated in time between two data points data[nA] and data[nB]
-
-    Parameters:
-    @X: The point in spacetime where we want to interpolate.
-
-    Observations:
-    - In slowlight mode, we perform linear interpolation in time. This function tells
-    us how far we've progressed from data[nA]->t to data[nB]->t but "in reverse" as
-    tinterp == 1 -> we're exactly on nA and tinterp == 0 -> we're exactly on nB. 
-    
-    - Currently, this function is just a placeholder, it must be implemented if SLOW_LIGHT is true.
-    """
-
-    return 0.0, 0, 0
+function set_tinterp_ns(X, data)
+    if (SLOW_LIGHT)
+        nA = 0
+        nB = 0
+        if(X[1] < data[2].t)
+            nA = 1
+            nB = 2
+        else
+            nA = 2
+            nB = 3
+        end
+        tinterp = 1. - (X[1] - data[nA].t)/(data[nB].t - data[nA].t)
+        return nA, nB, tinterp
+    else
+        return 1, 1, 0.0
+    end
 end
+
 
 function get_model_thetae(X, data)
     if(X_in_domain(X) == 0)
