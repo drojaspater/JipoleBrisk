@@ -623,65 +623,65 @@ Base.@inline function push_photon(X::SVector{4, Float64}, Kcon::SVector{4, Float
 end
 
 
-# Base.@inline function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
-#     """
-#     Pushes the photon geodesic forward/backwards by a step size dl/-dl using the analytic connection coefficients.
-#     Parameters:
-#     @X: Position vector of the photon in internal coordinates.
-#     @Kcon: Covariant 4-vector of the photon in internal coordinates.
-#     @dl: Step size for the geodesic integration.
-#     @Xhalf: Position vector of the photon at the half-step.
-#     @Kconhalf: Covariant 4-vector of the photon at the half-step.
-#     """
+Base.@inline function push_photon!(X::MVec4, Kcon::MVec4, dl::Float64, Xhalf::MVec4, Kconhalf::MVec4, lconn::Tensor3D, bhspin::Float64)
+    """
+    Pushes the photon geodesic forward/backwards by a step size dl/-dl using the analytic connection coefficients.
+    Parameters:
+    @X: Position vector of the photon in internal coordinates.
+    @Kcon: Covariant 4-vector of the photon in internal coordinates.
+    @dl: Step size for the geodesic integration.
+    @Xhalf: Position vector of the photon at the half-step.
+    @Kconhalf: Covariant 4-vector of the photon at the half-step.
+    """
 
-#     dKcon::Float64 = 0.0
+    dKcon::Float64 = 0.0
 
-#     if(MODEL == "analytic" || MODEL == "thin_disk")
-#         #Use analytic connection
-#         get_connection_analytic!(X, lconn, bhspin)
-#     elseif(MODEL == "iharm")
-#         #get_connection(X, bhspin, lconn)
-#         get_connection_analytic!(X, lconn, bhspin)
+    if(MODEL == "analytic" || MODEL == "thin_disk")
+        #Use analytic connection
+        get_connection_analytic!(X, lconn, bhspin)
+    elseif(MODEL == "iharm")
+        #get_connection(X, bhspin, lconn)
+        get_connection_analytic!(X, lconn, bhspin)
 
-#     else
-#         error("Unknown model: $MODEL")
-#     end 
+    else
+        error("Unknown model: $MODEL")
+    end 
 
-#     @inbounds for k in 1:NDIM
-#         @inbounds for i in 1:NDIM
-#             @inbounds for j in 1:NDIM
-#                 dKcon -= 0.5 * dl * lconn[k, i, j] * Kcon[i] * Kcon[j]
-#             end
-#         end
-#         Kconhalf[k] = Kcon[k] + dKcon
-#         Xhalf[k] = X[k] + 0.5 * dl * Kcon[k]
-#         dKcon = 0.0
-#     end
+    @inbounds for k in 1:NDIM
+        @inbounds for i in 1:NDIM
+            @inbounds for j in 1:NDIM
+                dKcon -= 0.5 * dl * lconn[k, i, j] * Kcon[i] * Kcon[j]
+            end
+        end
+        Kconhalf[k] = Kcon[k] + dKcon
+        Xhalf[k] = X[k] + 0.5 * dl * Kcon[k]
+        dKcon = 0.0
+    end
         
-#     if(MODEL == "analytic" || MODEL == "thin_disk")
-#         #Use analytic connection
-#         get_connection_analytic!(Xhalf, lconn, bhspin)
-#     elseif(MODEL == "iharm")
-#         #get_connection(Xhalf, bhspin, lconn)
-#         get_connection_analytic!(Xhalf, lconn, bhspin)
+    if(MODEL == "analytic" || MODEL == "thin_disk")
+        #Use analytic connection
+        get_connection_analytic!(Xhalf, lconn, bhspin)
+    elseif(MODEL == "iharm")
+        #get_connection(Xhalf, bhspin, lconn)
+        get_connection_analytic!(Xhalf, lconn, bhspin)
 
-#     else
-#         error("Unknown model: $MODEL")
-#     end 
+    else
+        error("Unknown model: $MODEL")
+    end 
 
-#     dKcon = 0.0
+    dKcon = 0.0
 
-#     @inbounds for k in 1:NDIM
-#         @inbounds for i in 1:NDIM
-#             @inbounds for j in 1:NDIM
-#                 dKcon -= dl * lconn[k, i, j] * Kconhalf[i] * Kconhalf[j]
-#             end
-#         end
-#         Kcon[k] += dKcon
-#         X[k] += dl * Kconhalf[k]
-#         dKcon = 0.0
-#     end
-# end
+    @inbounds for k in 1:NDIM
+        @inbounds for i in 1:NDIM
+            @inbounds for j in 1:NDIM
+                dKcon -= dl * lconn[k, i, j] * Kconhalf[i] * Kconhalf[j]
+            end
+        end
+        Kcon[k] += dKcon
+        X[k] += dl * Kconhalf[k]
+        dKcon = 0.0
+    end
+end
 
 const DEL = 1.e-6
 function get_connection(X::AbstractVector{T}, bhspin, conn::TTensor3D) where T
@@ -793,7 +793,8 @@ function stop_backward_integration(X, Kcon, Rh::Float64, Rstop::Float64)
     @X: Position vector of the photon in internal coordinates.
     @Kcon: Covariant 4-vector of the photon in internal coordinates.
     """
-    if (((X[2] > log(params.rmax_geo)) && (Kcon[2] < 0.0)) || (X[2] < log(Rh+ 0.0001)))
+    
+    if (((X[2] > log(Rstop)) && (Kcon[2] < 0.0)) || (X[2] < log(Rh+ 0.0001)))
         return 1
     end
 
@@ -923,7 +924,6 @@ function trace_geodesic(Xi::SVector{4, Float64}, Kconi::SVector{4, Float64}, tra
 
         nstep += 1
         
-        #traj[nstep] = OfTrajS(unit_dl, new_X, new_Kcon, Xhalf, Kconhalf)
         traj[nstep] = OfTrajS(0.0, new_X, new_Kcon, Xhalf, Kconhalf)
         
         X = new_X

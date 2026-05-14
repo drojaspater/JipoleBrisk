@@ -368,7 +368,6 @@ function load_data(filename::String, trat_large::Float64)
 
     #this is stupid, change this afterwards
     data_array = Vector{IharmData}(undef, 1)
-    
 
     
     #Rescale mdot

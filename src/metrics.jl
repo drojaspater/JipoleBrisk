@@ -21,16 +21,15 @@ end
 
 
 
-function gcov_func!(X::MVec4, bhspin::Float64, gcov, R0::Float64 = 0.0)
+function gcov_func!(X, bhspin, gcov, R0::Float64 = 0.0)
     """
     Returns g_{munu} at location specified by X.
     Adapted from ipole C code logic.
     """
     
     # Get Boyer-Lindquist coordinates (r, theta)
-    # Assumes bl_coord is defined elsewhere
     r, th = bl_coord(X) 
-    
+    T = promote_type(typeof(r), typeof(th), typeof(bhspin))
     # Initialize metric to zero
     fill!(gcov, 0.0)
 
@@ -60,7 +59,7 @@ function gcov_func!(X::MVec4, bhspin::Float64, gcov, R0::Float64 = 0.0)
     end
 
     #MKS 
-    Gcov_ks = @MMatrix zeros(4, 4)
+    Gcov_ks = @MMatrix zeros(T, 4, 4)
     
     cth = cos(th)
     sth = sin(th)
@@ -99,14 +98,13 @@ function gcov_func!(X::MVec4, bhspin::Float64, gcov, R0::Float64 = 0.0)
 end
 
 
-function gcov_func(X::MVec4, bhspin::Float64, R0::Float64 = 0.0)
+function gcov_func(X, bhspin, R0::Float64 = 0.0)
     """
     Returns g_{munu} at location specified by X.
     Adapted from ipole C code logic.
     """
     
     # Get Boyer-Lindquist coordinates (r, theta)
-    # Assumes bl_coord is defined elsewhere
     r, th = bl_coord(X) 
     T = promote_type(typeof(r), typeof(th), typeof(bhspin))
     gcov = @MMatrix zeros(T, 4, 4)
@@ -134,7 +132,7 @@ function gcov_func(X::MVec4, bhspin::Float64, R0::Float64 = 0.0)
     end
 
     #MKS 
-    Gcov_ks = @MMatrix zeros(4, 4)
+    Gcov_ks = @MMatrix zeros(T, 4, 4)
     
     cth = cos(th)
     sth = sin(th)

@@ -1,11 +1,21 @@
 include("../metrics.jl")
 
+const METRIC_MKS = 0
+const METRIC_BHACMKS = 1
+const METRIC_FMKS = 2
+const METRIC_MKS3 = 3
+const METRIC_EKS = 4
+
+const METRIC_MINKOWSKI = 5
+const METRIC_EMINKOWSKI = 6
+
 # Holds the physics/metric parameters (formerly C globals)
 mutable struct GlobalParams
     a::Float64
     Rout::Float64
     cstartx::MVector{4,Float64}
     cstopx::MVector{4,Float64}
+    metric::Int
 end
 
 #Model parameters (adjust spin in main.jl)
