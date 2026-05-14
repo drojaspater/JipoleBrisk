@@ -21,13 +21,17 @@ mutable struct OfTrajM
     Kcon::MVec4
     Xhalf::MVec4
     Kconhalf::MVec4
-    dX_dθo::MVec4
-    dK_dθo::MVec4
-    dX_da::MVec4
-    dK_da::MVec4
 end
 
+struct OfTrajS
+    dl::Float64
+    X::SVector{4, Float64}
+    Kcon::SVector{4, Float64}
+    Xhalf::SVector{4, Float64}
+    Kconhalf::SVector{4, Float64}
+end
 
+    
 struct OfTraj
     dl::Float64
     X::SVector{4, Float64}
@@ -54,6 +58,11 @@ include("radiation.jl")
 include("maxwell_juettner.jl")
 include("grid.jl")
 include("./models/$(MODEL).jl")
+
+if(SLOW_LIGHT)
+    println("Adding slowlight.jl file...")
+    include("./slowlight.jl")
+end
 
 include("geodesics.jl")
 include("autodiff.jl")

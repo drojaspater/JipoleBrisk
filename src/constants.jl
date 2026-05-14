@@ -16,6 +16,5 @@ const KBOL = 1.3806505e-16
 const SIGMA_THOMPSON = 6.65245873e-25
 const MP = 1.67262171e-24
 const EE = 4.80320680e-10  # electron charge
-const SLOW_LIGHT = false
 
 

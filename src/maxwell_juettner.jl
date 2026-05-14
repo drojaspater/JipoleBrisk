@@ -4,11 +4,6 @@ function get_nu_c(B)
     return EE * B/(2 * π * ME * CL)
 end
 
-
-
-
-
-
 function I_I(x)
     return 2.5651 * (1 + 1.92 * x^(-1. / 3.) +
         0.9977 * x^(-2. / 3.)) * exp(-1.8899 * x^(1. /
