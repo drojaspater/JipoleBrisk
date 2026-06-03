@@ -7,7 +7,7 @@
 const MODEL = "iharm"
 const MBH = 6.5e9        # Masa del agujero negro en masas solares (M87*)
 const SLOW_LIGHT = true
-include("Jipole/src/main.jl");
+include("src/main.jl");
 
 #################################################################################
 # CELDA 2 — Ruta a los dumps y configuración de la ventana temporal
