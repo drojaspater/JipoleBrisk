@@ -30,7 +30,7 @@ include("src/main.jl");
 const all_dumps_path = "/work/hdd/bekt/bprather/InterpStudy/LowRes/torus.out0.%05d.h5"
 
 const dump_start = 21000   # índice del primer dump
-const dump_max   = 21100   # índice del último dump (100 dumps = 50 M)
+const dump_max   = 21876    # índice del último dump (100 dumps = 50 M)
 const ImageCadence = 10    # una imagen cada 10 M → ~5 imágenes en este rango
 
 # Inicializa el struct de slow light con el contador en dump_start
@@ -105,7 +105,7 @@ println("Imágenes esperadas ≈ $(floor(Int, (params_slowlight.tf - params_slow
 # DXsize/DYsize: tamaño del plano imagen en Rg, escalado desde la distancia
 #                física a la fuente usando el ángulo de 160 μas de campo de vista
 const ro  = 1000.0
-const th  = 163.0
+const th  = 60.0  #Inclinación del observador 
 const phi = 0.0
 
 const res      = 128
@@ -248,8 +248,7 @@ println("t0    (tiempo más antiguo absoluto):         $t0")
 println("tgeof (dump más antiguo en zona de emisión): $tgeof")
 println("tgeoi (dump más reciente en zona de emisión): $tgeoi")
 
-# Libera RAM: los buffers temporales ya no se necesitan
-# all_geodesics se conserva porque process_slowlight_images! la reutiliza
+# Libera RAM
 thread_t0    = nothing
 thread_tgeoi = nothing
 thread_tgeof = nothing
@@ -257,24 +256,10 @@ thread_trajs = nothing
 GC.gc()
 println("Buffers temporales liberados. Procediendo a producir imágenes...")
 
-#################################################################################
-# CELDA 8 — Guardado opcional de all_geodesics
-# all_geodesics contiene la geometría completa de todas las geodésicas.
-# Como es estática (no depende del plasma), guardarla permite reutilizarla
-# en corridas futuras sin repetir el ray tracing, que es el paso más costoso.
-#
-# Se guarda en el directorio actual con el nombre "all_geodesics.jld2".
-# Para cargarlo en una sesión futura:
-#   using JLD2
-#   @load "all_geodesics.jld2" all_geodesics nsteps
-#
-# NOTA: puede ocupar varios GB dependiendo de la resolución y maxnstep.
-# Para res=128 con maxnstep=15000 ocupa aproximadamente 1-3 GB.
-# Comenta estas líneas si no necesitas reutilizar las geodésicas.
-
+# Guardado de all_geodesics, nsteps y midplane_crossings
 using JLD2
 println("Guardando all_geodesics en disco...")
-@save "all_geodesics.jld2" all_geodesics nsteps
+@save "all_geodesics.jld2" all_geodesics nsteps midplane_crossings
 println("all_geodesics guardado exitosamente.")
 
 #################################################################################
