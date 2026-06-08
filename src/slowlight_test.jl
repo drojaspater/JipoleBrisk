@@ -34,11 +34,20 @@ end
 
 using Printf
 
-#function update_dump_path()
-    dump_idx = params_slowlight.nloaded
-    params_slowlight.nloaded += 1 #Originalmente +1, estoy saltando de a dos snapshots 
+#####################
+const dump_paths = readlines("dump_list.txt")
 
-    return Printf.format(Printf.Format(all_dumps_path), dump_idx)
+function update_dump_path()
+    dump_idx = params_slowlight.nloaded
+    params_slowlight.nloaded += 1
+    return dump_paths[dump_idx]
+end
+#####################3
+#function update_dump_path()
+#    dump_idx = params_slowlight.nloaded
+#    params_slowlight.nloaded += 1 #Originalmente +1, estoy saltando de a dos snapshots 
+#
+#    return Printf.format(Printf.Format(all_dumps_path), dump_idx)
 #end
 
 function get_specific_dump_time(dump_idx::Int64)
@@ -62,6 +71,8 @@ function update_data!(simulation_data::Vector{IharmData})
     #Move the old memory block to the "newest" slot so it can be overwritten
     simulation_data[3] = oldest_data
     
+    # Avanza al siguiente dump de la lista antes de cargar
+    params_slowlight.current_dumps_path = update_dump_path()
     simulation_data[3] = load_data(params_slowlight.current_dumps_path, trat_large)
 
     #Update the global slowlight time parameters

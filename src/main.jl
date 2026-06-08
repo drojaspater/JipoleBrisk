@@ -113,7 +113,7 @@ include("./models/$(MODEL).jl")       # Modelo de la fuente seleccionado dinámi
 # de slow light (los fotones viajan con tiempo de viaje real, no instantáneo)
 if(SLOW_LIGHT)
     println("Adding slowlight.jl file...")
-    include("./slowlight.jl")
+    include("./slowlight_test.jl")
 end
 
 include("geodesics.jl")       # Integración de geodésicas (trayectorias de los fotones)

@@ -86,15 +86,12 @@ simulation_data[3] = load_data(params_slowlight.current_dumps_path, trat_large)
 params_slowlight.tA = simulation_data[1].t  # tiempo del dump más antiguo en memoria
 params_slowlight.tB = simulation_data[2].t  # tiempo del dump siguiente
 
-params_slowlight.tf = get_specific_dump_time(params_slowlight.dump_max)  # límite superior
-
-##########
-## Lee el tiempo del último dump directamente desde su ruta
-#last_dump_path = readlines("dump_list.txt")[end]
-#h5open(last_dump_path, "r") do file
-#    params_slowlight.tf = read(file, "t")
-#end
-##########
+# Lee el tiempo del último dump directamente desde su ruta
+# Necesario porque dump_max ahora es el número de dumps (877), no un índice de archivo
+last_dump_path = readlines("dump_list.txt")[end]
+h5open(last_dump_path, "r") do file
+    params_slowlight.tf = read(file, "t")
+end
 
 println("tA = $(params_slowlight.tA) M")
 println("tB = $(params_slowlight.tB) M")
